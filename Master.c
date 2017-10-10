@@ -1,11 +1,16 @@
 #include "OnDiskStructure.h"
 #include <stdio.h>
 #include <iostream.h>
+#include <string.h>
+#include <assert.h>
+#include <sys/stat.h>
+#include <dirent.h>
 #include <ftw.h>
 
 const int MAX_METADATA = 2000;
 
 metadata* meta;
+int metadataPointer = 0;
 
 int main(int argc, char **argv){
 	// initialize our structure
@@ -35,9 +40,58 @@ int main(int argc, char **argv){
 }
 
 // function called on each sub directory/file, updates the global information
-int s_builder(const char *, const struct stat64 *, int, struct FTW *){
+int s_builder(const char * path_name, const struct stat64 * object_info, int ftw, struct FTW * data){
 
+	// store directory metadata
+	if(ftw == FTW_D){
+		//get filename
+		char* file_name = (char*) malloc( (sizeof(path_name)/sizeof(char) - FTW->base)*sizeof(char));
+		for(int i = 0 i < (sizeof(path_name)/sizeof(char) - FTW->base); i++){
+			file_name[i] = path_name[FTW->base + i];
+		}
+
+		// get number of files in directory algo from: https://stackoverflow.com/questions/1723002/how-to-list-all-subdirectories-in-a-given-directory-in-c?answertab=votes#tab-top
+		int dir_length = 0;
+    	struct dirent* d;
+    	DIR* rdir = opendir(path_name);
+    	while((d = readdir(rdir)) != NULL)
+    	{
+        	struct stat st;
+			if (fstatat(dirfd(rdir), d->d_name, &st, 0) < 0){
+            	perror(d->d_name);
+        	}
+        	else{
+        		dir_length++;
+        	}
+    	}
+    	closedir(rdir);
+		
+		// assign all values
+		meta[metadataPointer]->name = file_name;
+		meta[metadataPointer]->type = 1;
+		meta[metadataPointer]->length = dir_length;
+		meta[metadataPointer]->time = object_info->st_mtime;
+		meta[metadataPointer]->p = opendir(path_name);
+		metadataPointer++;
+	}
+	// Store File Metadata - possibly add in FTW_NS and FTW_SNL functionality for failed symbolic links
+	else if((ftw == FTW_F) || (ftw == FTW_SL)){
+		//get filename
+		char* fileName = (char*) malloc( (sizeof(path_name)/sizeof(char) - FTW->base)*sizeof(char));
+		for(int i = 0 i < (sizeof(path_name)/sizeof(char) - FTW->base); i++){
+			file_name[i] = path_name[FTW->base + i];
+		}
+		// assign all values
+		meta[metadataPointer]->name = file_name;
+		meta[metadataPointer]->type = 0;
+		meta[metadataPointer]->length = object_info->st_size;
+		meta[metadataPointer]->time = object_info->st_mtime; // time of last modification, could also use atime for last access or ctime for last status change
+		meta[metadataPointer]->p = fopen(path_name, "r"); // open the file for reading, when writing to img use this stream
+		metadataPointer++;
+	}
+	else{
+		//don't save anything for now, this could definitely cause problems
+	}
 }
 
 // function to write the file 
-
