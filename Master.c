@@ -36,14 +36,9 @@ int main(int argc, char **argv){
             // filepath
             // function to call on each directory/file
             // max number of directories that can be used
-<<<<<<< HEAD
+
             // flags to specialize usage, we aren't using any right now
     int result =  nftw(argv[1], s_builder, MAX_METADATA, 0);
-=======
-            // flags to specialize usage, we aren't using any right now  
-
-    int result =  nftw(argv[1], s_builder, MAX_METADATA, 0);		
->>>>>>> bb3b90adf3ed8ee2d80ff3604fa15cf60a4ff082
 
     // Now write the file to a structure
     int imageStatus = image();
@@ -57,11 +52,11 @@ int s_builder(const char * path_name, const struct stat * object_info, int ftw, 
 	if(ftw == FTW_D){
 		//get filename
         char* path_name2;
-        strncpy(path_name2, path_name, strlen(path_name)); 
+        strncpy(path_name2, path_name, strlen(path_name));
         char* buf;
         buf = std::strtok(path_name2, "/");
         char* buff;
-        while (buf != NULL){   
+        while (buf != NULL){
             buff = buf;
             buf = std::strtok (NULL, "/");
         }
@@ -104,18 +99,16 @@ int s_builder(const char * path_name, const struct stat * object_info, int ftw, 
 	// Store File Metadata - possibly add in FTW_NS and FTW_SNL functionality for failed symbolic links
 	else if((ftw == FTW_F) || (ftw == FTW_SL)){
 		//get filename
-<<<<<<< HEAD
 		char* file_name = (char*) malloc( (sizeof(path_name)/sizeof(char) - data->base)*sizeof(char));
 		for(int i = 0; i < (sizeof(path_name)/sizeof(char) - data->base); i++){
 			file_name[i] = path_name[data->base + i];
 		}
-=======
         char* path_name2;
-        strncpy(path_name2, path_name, strlen(path_name)); 
+        strncpy(path_name2, path_name, strlen(path_name));
         char* buf;
         buf = std::strtok(path_name2, "/");
         char* buff;
-        while (buf != NULL){   
+        while (buf != NULL){
             buff = buf;
             buf = std::strtok (NULL, "/");
         }
@@ -125,7 +118,6 @@ int s_builder(const char * path_name, const struct stat * object_info, int ftw, 
             file_name[i] = buff[i];
         }
         std::cout << file_name <<"\n";
->>>>>>> bb3b90adf3ed8ee2d80ff3604fa15cf60a4ff082
 
 		// assign all values
         for(int i =0; i < 256; i++){
