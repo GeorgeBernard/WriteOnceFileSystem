@@ -20,7 +20,7 @@ int metadataPointer = 0;
 
 int main(int argc, char **argv){
 	// initialize our structure
-	meta = (m_prs*) malloc(MAX_METADATA * sizeof(m_prs)); 
+	meta = (m_prs*) malloc(MAX_METADATA * sizeof(m_prs));
 	// ensure input is appropriate
     if(argc < 2){
     	std::cout << "Please input a directory to master." << "\n";
@@ -36,11 +36,11 @@ int main(int argc, char **argv){
             // filepath
             // function to call on each directory/file
             // max number of directories that can be used
-            // flags to specialize usage, we aren't using any right now  
-    int result =  nftw(argv[1], s_builder, MAX_METADATA, 0);		
+            // flags to specialize usage, we aren't using any right now
+    int result =  nftw(argv[1], s_builder, MAX_METADATA, 0);
 
     // Now write the file to a structure
-    image();
+    int imageStatus = image();
 	return 0;
 }
 
@@ -55,7 +55,7 @@ int s_builder(const char * path_name, const struct stat * object_info, int ftw, 
 			file_name[i] = path_name[data->base + i];
 		}
 
-		// get number of files in directory algo from: https://stackoverfloxw.com/questions/1723002/how-to-list-all-subdirectories-in-a-given-directory-in-c?answertab=votes#tab-top
+		// get number of files in directory algo from: https://stackoverflow.com/questions/1723002/how-to-list-all-subdirectories-in-a-given-directory-in-c?answertab=votes#tab-top
 		int dir_length = 0;
     	struct dirent* d;
     	// TODO Consider this- 2 loops or one loop and then rebuilding loop?
@@ -68,7 +68,7 @@ int s_builder(const char * path_name, const struct stat * object_info, int ftw, 
             	perror(d->d_name);
         	}
         	else{
-        		dir_length++;        		
+        		dir_length++;
         	}
     	}
     	closedir(rdir);
@@ -91,11 +91,11 @@ int s_builder(const char * path_name, const struct stat * object_info, int ftw, 
 		for(int i = 0; i < (sizeof(path_name)/sizeof(char) - data->base); i++){
 			file_name[i] = path_name[data->base + i];
 		}
-        
+
 		// assign all values
         for(int i =0; i < 255; i++){
             meta[metadataPointer].name[i] = file_name[i];
-        }		
+        }
         meta[metadataPointer].type = PLAIN_FILE;
 		meta[metadataPointer].length = object_info->st_size;
 		meta[metadataPointer].time = object_info->st_mtime; // time of last modification, could also use atime for last access or ctime for last status change
@@ -104,22 +104,13 @@ int s_builder(const char * path_name, const struct stat * object_info, int ftw, 
 	}
 }
 
-// function to write the file 
+// function to write the file
 int image(){
-	
-
+	FILE *output;
+	output = fopen("./output.wofs", "a");
+	for (int i=0; &meta[i] != '\0'; i++) {
+		fwrite(meta[i], sizeof(char), sizeof(meta[i]->name) + sizeof(meta[i]->type)
+			+ sizeof(meta[i]->length) + sizeof(meta[i]->time) + sizeof(meta[i]->p), output);
+	}
+	fclose(output);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
