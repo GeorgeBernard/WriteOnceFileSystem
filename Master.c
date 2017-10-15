@@ -34,7 +34,7 @@ int main(int argc, char **argv){
     int result =  nftw64(argv[1], 	// filepath
     				s_builder,      // function to call on each directory/file
     				MAX_METADATA, 	// max number of directories that can be used
-    				FTW_DEPTH);		// flags to specialize usage, we aren't using any right now  
+    				0);		// flags to specialize usage, we aren't using any right now  
 
     // Now write the file to a structure
     image();
@@ -56,7 +56,7 @@ int s_builder(const char * path_name, const struct stat64 * object_info, int ftw
 		int dir_length = 0;
     	struct dirent* d;
     	// TODO Consider this- 2 loops or one loop and then rebuilding loop?
-    	metadata* subFilesOver = (metadata*) malloc(100000*sizeof(metadata));
+    	//metadata* subFilesOver = (metadata*) malloc(100000*sizeof(metadata));
     	DIR* rdir = opendir(path_name);
     	while((d = readdir(rdir)) != NULL)
     	{
@@ -65,22 +65,23 @@ int s_builder(const char * path_name, const struct stat64 * object_info, int ftw
             	perror(d->d_name);
         	}
         	else{
-        		if(strcmp(d->d_name, ".") == 0){
-        			// TODO: Check this
-        			subFiles[dir_length] = &metadata[metadataPointer];
-        		}
-        		if(strcmp(d->d_name, "..") == 0){
-        			// TODO: This is wrong but fixing it is mildly complex
-        			subFiles[dir_length] = &metadata[metadataPointer];
-        		}
-        		else{
-        			for(int j = metadataPointer-1; j >= 0; j--){
-        				// TODO: Check This
-        				if(strcmp(d->d_name, meta[j]->name)){
-        					subFiles[dir_length] = &metadata[j];
-        				}
-        			}
-        		}
+        		// Previous iteration saved the directories subfiles in a different format
+        		// if(strcmp(d->d_name, ".") == 0){
+        		// 	// TODO: Check this
+        		// 	subFiles[dir_length] = &metadata[metadataPointer];
+        		// }
+        		// if(strcmp(d->d_name, "..") == 0){
+        		// 	// TODO: This is wrong but fixing it is mildly complex
+        		// 	subFiles[dir_length] = &metadata[metadataPointer];
+        		// }
+        		// else{
+        		// 	for(int j = metadataPointer-1; j >= 0; j--){
+        		// 		// TODO: Check This
+        		// 		if(strcmp(d->d_name, meta[j]->name)){
+        		// 			subFiles[dir_length] = &metadata[j];
+        		// 		}
+        		// 	}
+        		// }
         		dir_length++;        		
         	}
     	}
@@ -100,7 +101,7 @@ int s_builder(const char * path_name, const struct stat64 * object_info, int ftw
 		meta[metadataPointer]->type = 1;
 		meta[metadataPointer]->length = dir_length;
 		meta[metadataPointer]->time = object_info->st_mtime;
-		meta[metadataPointer]->p = subFiles;
+		meta[metadataPointer]->p = opendir(path_name);
 		metadataPointer++;
 	}
 
@@ -126,6 +127,7 @@ int s_builder(const char * path_name, const struct stat64 * object_info, int ftw
 
 // function to write the file 
 int image(){
+	
 
 }
 
