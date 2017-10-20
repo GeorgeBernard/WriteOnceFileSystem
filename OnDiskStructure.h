@@ -21,16 +21,10 @@ struct metadata_header {
 	char name[256];       // name of the file or directory
 	enum file_type type;    // indicates file or directory 0 - file 1 - directory
 	uint64_t length;
-	uint64_t time;  
-	uint64_t offset;        
-					
+	uint64_t time;
+	uint64_t offset;
+
 };
 typedef struct metadata_header m_hdr;
 
-
-
-
-
-
-
-#endif 
+#endif

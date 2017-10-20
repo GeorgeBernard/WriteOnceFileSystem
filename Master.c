@@ -28,7 +28,7 @@ int subitems_count = 0;
 
 int main(int argc, char **argv){
 	// initialize our structure
-	meta = (m_prs*) malloc(MAX_METADATA * sizeof(m_prs)); 
+	meta = (m_prs*) malloc(MAX_METADATA * sizeof(m_prs));
 	// ensure input is appropriate
     if(argc < 2){
     	std::cout << "Please input a directory to master." << "\n";
@@ -44,8 +44,9 @@ int main(int argc, char **argv){
             // filepath
             // function to call on each directory/file
             // max number of directories that can be used
-            // flags to specialize usage, we aren't using any right now  
-    int result =  nftw(argv[1], s_builder, MAX_METADATA, 0);		
+
+            // flags to specialize usage, we aren't using any right now
+    int result =  nftw(argv[1], s_builder, MAX_METADATA, 0);
 
     for(int i = 0; i < metadataPointer; i++){
         std::cout << meta[i].name << "\n";
@@ -57,7 +58,7 @@ int main(int argc, char **argv){
 
 
     // Now write the file to a structure
-    image();
+    int imageStatus = image();
 	return 0;
 }
 
@@ -73,6 +74,7 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 
 		// get number of files in directory algo from: https://stackoverfloxw.com/questions/1723002/how-to-list-all-subdirectories-in-a-given-directory-in-c?answertab=votes#tab-top
         int dir_length = 0;
+
     	struct dirent* d;
     	DIR* rdir = opendir(path_name);
     	while((d = readdir(rdir)) != NULL)
@@ -82,7 +84,7 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
             	perror(d->d_name);
         	}
         	else{
-        		dir_length++;        		
+        		dir_length++;
         	}
     	}
     	closedir(rdir);
@@ -133,10 +135,19 @@ const char* parse_name(const char * path_name){
     return s.c_str();
 }
 
-// function to write the file 
+// function to write the file
 int image(){
     uint64_t header_offset = 0;
     uint64_t file_offset = find_header_size();
+
+
+    FILE *output;
+    output = fopen("./output.wofs", "a");
+    for (int i=0; &meta[i] != '\0'; i++) {
+        fwrite(meta[i], sizeof(char), sizeof(meta[i]->name) + sizeof(meta[i]->type)
+            + sizeof(meta[i]->length) + sizeof(meta[i]->time) + sizeof(meta[i]->p), output);
+    }
+    fclose(output);
     for(int i = 0; i < metadataPointer; i++){
         std::cout << meta[i].name << "\n";
         std::cout << meta[i].type << "\n";
@@ -150,16 +161,4 @@ int image(){
 uint64_t find_header_size(){
     uint64_t h_size = header_count * sizeof(m_hdr) + subitems_count * sizeof(uint64_t);
 } 
-
-
-
-
-
-
-
-
-
-
-
-
 
