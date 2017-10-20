@@ -5,10 +5,12 @@
 #include <string.h>
 #include <iostream>
 #include <fstream>
+#include <endian.h>
 
 #include <stdio.h>
 int main(int argc, char* argv[])
 {
+    std::cout << "Creating a test file" << std::endl;
     // Intend to create directory with one file
     m_hdr* root_ptr = new m_hdr;
     std::string root_str = "root";
@@ -30,21 +32,23 @@ int main(int argc, char* argv[])
     file_ptr->time = 0;
     file_ptr->length = 11;
     file_ptr->offset = 2*sizeof(m_hdr)+sizeof(uint64_t);
-    
+
     std::ofstream output;
     output.open("example.wfs", std::ios::out | std::ios::trunc | std::ios::binary);
 
     // append root
     if(output.is_open()){
-        output.write(root_ptr->name, 255);
+        //output.write(root_ptr->name, 255);
         char term = '\0';
-        output.write(&term, sizeof(char));
-        std::cout << sizeof(file_type) << root_ptr->type << std::endl;
-        output.write((char*) &root_ptr->type, sizeof(file_type));
+        //output.write(&term, sizeof(char));
+        //std::cout << sizeof(file_type) << root_ptr->type << std::endl;
+        //output.write((char*) &root_ptr->type, sizeof(file_type));
         output.write((char*) &root_ptr->length, sizeof(uint64_t) );
-        output.write((char*) &root_ptr->time, sizeof(uint64_t) );
-        output.write((char*) &root_ptr->offset, sizeof(uint64_t) );
-        
+        uint64_t reversed = htole64(&root_ptr->length);
+        output.write((char*) reversed, sizeof(uint64_t) );
+        //output.write((char*) &root_ptr->time, sizeof(uint64_t) );
+        //output.write((char*) &root_ptr->offset, sizeof(uint64_t) );
+        return 0;
         output.write((char*) &offset_arr[0], sizeof(uint64_t));
 
         output.write(file_ptr->name, 255);
