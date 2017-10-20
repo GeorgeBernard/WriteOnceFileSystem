@@ -135,9 +135,21 @@ const char* parse_name(const char * path_name){
 
 // function to write the file 
 int image(){
+    uint64_t header_offset = 0;
+    uint64_t file_offset = find_header_size();
+    for(int i = 0; i < metadataPointer; i++){
+        std::cout << meta[i].name << "\n";
+        std::cout << meta[i].type << "\n";
+        std::cout << meta[i].length << "\n";
+    }
+    
 	return 0;
 }
 
+
+uint64_t find_header_size(){
+    uint64_t h_size = header_count * sizeof(m_hdr) + subitems_count * sizeof(uint64_t);
+} 
 
 
 
