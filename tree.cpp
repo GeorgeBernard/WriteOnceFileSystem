@@ -13,8 +13,8 @@ void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth);
 uint64_t toBigEndian64(uint64_t value);
 uint32_t toBigEndian32(uint32_t value);
 uint64_t readOffset(std::fstream& input, uint64_t offset);
-
 m_hdr* readHeader(std::fstream& input, uint64_t offset);
+void printString(char* s);
 
 int main(int argc, char* argv[])
 {
@@ -95,7 +95,6 @@ int main(int argc, char* argv[])
 
 m_hdr* readHeader(std::fstream& input, uint64_t offset) {
 
-    std::cout << "read header" << std::endl << "offset: " << offset << std::endl;
     m_hdr* header = new m_hdr;
     input.seekg(offset);
     input.read((char*)header, sizeof(m_hdr));
@@ -125,12 +124,13 @@ uint32_t toBigEndian32(uint32_t value) {
 
 void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth){
 
-   
-    std::cout   << depth << hdr->name 
-                << std::endl;
+    for (int i = 0; i<depth; i++) {
+        std::cout << '-';
+    }
+    printString(hdr-> name);
 
     file_type type =  hdr->type;
-    std::cout << "file type: " << type << std::endl;
+    //std::cout << "file type: " << type << std::endl;
     
     if(type == file_type::PLAIN_FILE)
     {
@@ -139,11 +139,8 @@ void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth){
     if(type == file_type::DIRECTORY)
     {
         uint64_t init_offset = hdr->offset;
-        std::cout << "length: " << hdr->length << std::endl;
         for(auto i = 0U; i < hdr->length; ++i){
-            std::cout << "count: " << i << std::endl;
             uint64_t next_offset = init_offset + i*sizeof(uint64_t);
-            
             uint64_t x = readOffset(input, next_offset);
 
             m_hdr* sub = new m_hdr;
@@ -152,4 +149,20 @@ void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth){
             delete sub;
         }
     }
+}
+
+void printString(char* s) {
+    int firstNonspace = 255;
+    for (int i=254; i>=0; i--) {
+        if (s[i] != ' ') {
+            firstNonspace = i+1;
+            break;
+        }
+    }
+
+    char buffer[firstNonspace];
+    std::string str (s);
+    std::size_t length = str.copy(buffer, firstNonspace, 0);
+    buffer[length] = '\0';
+    std::cout << buffer << std::endl;
 }
