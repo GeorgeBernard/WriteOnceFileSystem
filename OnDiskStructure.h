@@ -18,11 +18,19 @@ enum file_type : uint32_t {DIRECTORY = 0, PLAIN_FILE = 1, SYM_LINK = 2};
 
 struct metadata_header {
     char name[256];
-    enum file_type type;
-    uint64_t time;
     uint64_t length;
+    uint64_t time;
     uint64_t offset;
+    enum file_type type;
 };
 typedef struct metadata_header m_hdr;
+
+struct metadata_test {
+    uint64_t a; 
+    uint32_t b;
+    uint64_t c;
+
+};
+typedef struct metadata_test m_test;
 
 #endif 
