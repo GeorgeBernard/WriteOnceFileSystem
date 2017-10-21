@@ -18,78 +18,20 @@ void printString(char* s);
 
 int main(int argc, char* argv[])
 {
+    if (argc < 1) {
+        std::cout << "please provide name of file" << std::endl;
+        return 0;
+    }
 
-    // m_test* test_ptr = new m_test;
-    // std::fstream i;
-    // i.open("ryanTest.wfs", std::ios::in | std::ios::binary);
-    // i.read((char*)test_ptr, sizeof(m_test));
-    // std :: cout << sizeof(test_ptr -> c) << "\n";
-    // std::cout << std::hex << "a: " << test_ptr->a  << "\n"
-    //         << std::hex << "b: " << test_ptr->b << "\n"
-    //         << std::hex << "c: " << test_ptr->c << "\n"
-    //         << std::endl;
-    // // std::cout << std::hex << "b: " << test_ptr->b << "\n"
-    // //         << std::endl;
-    // return 0;
-
-
+    char* fileName = argv[1];
     m_hdr* root_ptr = new m_hdr;
 
     std::fstream input;
-    input.open("example.wfs", std::ios::in | std::ios::binary);
+    input.open(fileName, std::ios::in | std::ios::binary);
 
     input.seekg(0);
-    
-    // uint64_t* length_pointer = new uint64_t;
-    // input.read((char*)length_pointer, sizeof(uint64_t));
-    // std::cout << std::hex << *length_pointer << "\n";
-    // uint64_t reversed = htobe64(*length_pointer);
-    // std::cout << std::hex << reversed << "\n";
-    // return 0;
-
-    // char name [256];
-    // input.read((char*)name, 256);
-    // std::cout << name << std::endl;
-    // return 0;
-    // uint32_t reversed2 = htobe32(root_ptr -> type);
-    // //std::cout << "before reverse" << std::hex << root_ptr -> length << "\n";
-    // std::cout << "before reverse: " << std::bitset<32> (root_ptr -> type) << "\n";
-    // //std::cout << "after reverse" << std::hex << reversed << "\n";
-    // std::cout << "after reverse: " <<  std::bitset<32> (reversed2) << "\n";
-
-    // uint64_t reversed64 = htobe64(root_ptr -> length);
-    // //std::cout << "before reverse" << std::hex << root_ptr -> length << "\n";
-    // std::cout << "before reverse: " << std::bitset<64> (root_ptr -> length) << "\n";
-    // //std::cout << "after reverse" << std::hex << reversed << "\n";
-    // std::cout << "after reverse: " <<  std::bitset<64> (reversed64) << "\n";
-    
     root_ptr = readHeader(input, 0);
     print_metadata(input, root_ptr, 0);
-    return 0;
-
-    std::cout << root_ptr->name << "\n"
-            << "type: " << toBigEndian32(root_ptr -> type) << "\n"
-            << "length: " << toBigEndian64(root_ptr -> length) << "\n"
-            << "time: " << toBigEndian64(root_ptr->time) << "\n"
-            << "offset: " << toBigEndian64(root_ptr->offset) << "\n"
-            << std::endl;
-
-    //print_metadata(input, root_ptr, 0);
-
-    uint64_t* firstOffset = new uint64_t;
-    std::cout << "seeked to: " << toBigEndian64(root_ptr -> offset) << std::endl;
-    input.seekg(toBigEndian64(root_ptr->offset));
-
-    input.read((char*)firstOffset, sizeof(uint64_t));
-
-    uint64_t reversed64 = toBigEndian64(*firstOffset);
-    std::cout << "before reverse: " << std::hex << *firstOffset << "\n";
-    std::cout << "before reverse: " << std::bitset<64> (*firstOffset) << "\n";
-    std::cout << "after reverse: " << std::hex << reversed64 << "\n";
-    std::cout << "after reverse: " <<  std::bitset<64> (reversed64) << "\n";
-
-    std::cout << "offset: " << toBigEndian64(*firstOffset) << std::endl;
-    input.close();
     return 0;
 }
 
