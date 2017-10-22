@@ -1,15 +1,20 @@
 CFLAGS= -Wall -Wextra -std=c++17
 
-all: generate.o tree.o
+##============================== Infrastructure ==============================##
 
-generate.o: generate.cpp
-	g++ $(CFLAGS) generate.cpp -o generate.out
-
-tree.o: tree.cpp
-	g++ $(CFLAGS) tree.cpp -o tree.out
-
+all: generate.out tree.out
 
 rebuild: clean all
 
 clean:
 	rm -f *.o *.out *.wfs
+
+##================================ Executables ===============================##
+
+generate.out: generate.cpp
+	g++ $(CFLAGS) generate.cpp -o generate.out
+
+tree.out: tree.cpp
+	g++ $(CFLAGS) tree.cpp -o tree.out
+
+

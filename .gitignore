@@ -1,2 +1,8 @@
+# Compiled object files
+.o
+
+# Generated image files
 .wfs
+
+# Executables
 .out

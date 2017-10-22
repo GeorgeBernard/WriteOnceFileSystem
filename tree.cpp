@@ -9,6 +9,8 @@
 #include <endian.h>
 #include <bitset>
 
+//========================== Function Declarations ===========================//
+
 /** 
     Prints metadata tree from root of hdr
     
@@ -29,45 +31,77 @@ uint64_t toBigEndian64(uint64_t value);
 uint32_t toBigEndian32(uint32_t value);
 
 /** 
+    Reads value from input file at offset
+    
+    @param input: the input stream from which to load the metadata.
+    @param offset: the offset from the beginning of the file that addresses the 
+        value
+    @return value at offset
 */
 uint64_t readOffset(std::fstream& input, uint64_t offset);
 
 /** 
+    Reads header metadata struct from input file at offset
+
+    @param input: the input stream from which to load the metadata.
+    @param offset: the offset from the beginning of the file that addresses the 
+        value
+    @return header at offset
 */
 m_hdr* readHeader(std::fstream& input, uint64_t offset);
 
-/** 
+/**
+    Prints just the payload string in a space padded buffer
+    
+    @param s: the pointer to the first character in the space padded buffer
+    @return the payload string within the space padded buffer   
 */
 void printString(char* s);
 
+//=========================== Function Definitions ===========================//
+
 int main(int argc, char* argv[])
 {
-    if (argc < 1) {
+    // Sanity check arguments and ensure the user has given us a filename
+    if (argc < 2) {
         std::cout << "please provide name of file" << std::endl;
-        return 0;
+        return EXIT_FAILURE;
     }
 
-    char* fileName = argv[1];
-    m_hdr* root_ptr = new m_hdr;
-
+    // Create file stream, and open with user given filename
     std::fstream input;
-    input.open(fileName, std::ios::in | std::ios::binary);
+    char* filename = argv[1];
+    input.open(filename, std::ios::in | std::ios::binary);
 
+    // Check if file was properly opened
+    if (!input.is_open()) {
+        std::cout << "failed to open " << filename << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    // Set stream position to zero, and get first header 
     input.seekg(0);
-    root_ptr = readHeader(input, 0);
+    m_hdr* root_ptr = readHeader(input, 0);
     print_metadata(input, root_ptr, 0);
-    return 0;
+
+    // Cleanup and return
+    delete root_ptr;
+    return EXIT_SUCCESS;
 }
 
 m_hdr* readHeader(std::fstream& input, uint64_t offset) {
 
+    // Instantiate new header
     m_hdr* header = new m_hdr;
+
+    // Read the header data starting at the offset
     input.seekg(offset);
     input.read((char*)header, sizeof(m_hdr));
 
-    header -> type = (file_type) toBigEndian32(header -> type);
+    // Set data values in output header
+    header -> type   = (file_type) toBigEndian32(header -> type);
     header -> length = toBigEndian64(header -> length);
-    header -> time = toBigEndian64(header -> time);
+    header -> time   = toBigEndian64(header -> time);
     header -> offset = toBigEndian64(header -> offset);
 
     return header;
@@ -75,9 +109,9 @@ m_hdr* readHeader(std::fstream& input, uint64_t offset) {
 
 uint64_t readOffset(std::fstream& input, uint64_t offset) {
     input.seekg(offset);
-    uint64_t* read_offset = new uint64_t;
-    input.read((char*)read_offset, sizeof(uint64_t));
-    return toBigEndian64(*read_offset);
+    uint64_t read_offset;
+    input.read((char*)&read_offset, sizeof(uint64_t));
+    return toBigEndian64(read_offset);
 }
 
 uint64_t toBigEndian64(uint64_t value) {
@@ -117,6 +151,8 @@ void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth){
             m_hdr* sub = new m_hdr;
             sub = readHeader(input, x);
             print_metadata(input, sub, depth+1);
+
+            // Cleanup
             delete sub;
         }
     }
