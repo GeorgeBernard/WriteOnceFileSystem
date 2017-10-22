@@ -15,10 +15,10 @@ static int s_builder(const char *, const struct stat *, int, struct FTW *);
 int image();
 static int display_info(const char *, const struct stat *, int, struct FTW *);
 const char* parse_name(const char *);
+uint64_t find_header_size();
 
 
-
-const int MAX_METADATA = 100;
+const int MAX_METADATA = 1000;
 
 m_prs* meta;
 
@@ -91,7 +91,7 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 
 		// assign all values
         subitems_count = subitems_count + dir_length;
-        for(int i =0; i < 256; i++){
+        for(int i =0; i < 255; i++){
             meta[metadataPointer].name[i] = file_name[i];
         }
 
@@ -107,7 +107,7 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 		//get filename
         const char* file_name = parse_name(path_name);
 		// assign all values
-        for(int i =0; i < 256; i++){
+        for(int i =0; i < 255; i++){
             meta[metadataPointer].name[i] = file_name[i];
         }		
 
@@ -143,16 +143,57 @@ int image(){
 
     FILE *output;
     output = fopen("./output.wofs", "a");
-    for (int i=0; &meta[i] != '\0'; i++) {
-        fwrite(meta[i], sizeof(char), sizeof(meta[i]->name) + sizeof(meta[i]->type)
-            + sizeof(meta[i]->length) + sizeof(meta[i]->time) + sizeof(meta[i]->p), output);
+
+    
+
+    //write type dependant information
+    for(int i = 0; i < metadataPointer; i++){
+        //Write univesal information
+        fwrite(meta[i].name, sizeof(char), 255, output);
+        char lastChar = '\0';
+        fwrite(&lastChar, sizeof(char), 1, output);
+        fwrite((char*) meta[i].length, sizeof(uint64_t), 1, output);
+        fwrite((char*) meta[i].time, sizeof(uint64_t), 1, output);
+        fwrite((char*) meta[i].type, sizeof(uint32_t), 1, output );
+
+        if(meta[i].type == PLAIN_FILE){
+            fwrite((char*) &file_offset, sizeof(uint64_t), 1, output);
+            header_offset = header_offset + sizeof(m_hdr);
+
+
+            // Write actual file to memory
+            fseek(output, file_offset, SEEK_SET);
+            char buffer[meta[i].length];
+            size_t bytes;
+
+            while (0 < (bytes = fread(buffer, 1, sizeof(buffer), (FILE*) meta[i].p))){
+                fwrite(buffer, 1, bytes, output);
+            }
+            file_offset = file_offset + meta[i].length;
+            // Move back to header
+            fseek(output, header_offset, SEEK_SET);
+            fclose((FILE*) met[i].p)
+        }
+        else if (meta[i].type == DIRECTORY){
+            // Write Directory Array Values
+            struct dirent* d;
+            DIR* rdir = (DIR*) meta[i].p;
+            while((d = readdir(rdir)) != NULL){
+                struct stat st;
+                if (fstatat(dirfd(rdir), d->d_name, &st, 0) < 0){
+                    perror(d->d_name);
+                }
+                else{
+                    //TODO: Store address to correct array header
+
+
+                }
+            }
+            closedir(rdir);
+        }
     }
     fclose(output);
-    for(int i = 0; i < metadataPointer; i++){
-        std::cout << meta[i].name << "\n";
-        std::cout << meta[i].type << "\n";
-        std::cout << meta[i].length << "\n";
-    }
+
     
 	return 0;
 }
