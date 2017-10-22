@@ -12,4 +12,4 @@ tree.o: tree.cpp
 rebuild: clean all
 
 clean:
-	rm -f *.o *.out
+	rm -f *.o *.out *.wfs

@@ -9,11 +9,35 @@
 #include <endian.h>
 #include <bitset>
 
+/** 
+    Prints metadata tree from root of hdr
+    
+    @param input: the input stream from which to load the metadata.
+    @param hdr: the root metadata header from which to print down from
+    @param depth: the depth for which you call the print recursion
+*/
 void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth);
+
+/** 
+    Converts value from little endian to big endian (i.e. reverses it)
+*/
 uint64_t toBigEndian64(uint64_t value);
+
+/** 
+    Converts value from little endian to big endian (i.e. reverses it)
+*/
 uint32_t toBigEndian32(uint32_t value);
+
+/** 
+*/
 uint64_t readOffset(std::fstream& input, uint64_t offset);
+
+/** 
+*/
 m_hdr* readHeader(std::fstream& input, uint64_t offset);
+
+/** 
+*/
 void printString(char* s);
 
 int main(int argc, char* argv[])
@@ -66,18 +90,23 @@ uint32_t toBigEndian32(uint32_t value) {
 
 void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth){
 
-    for (int i = 0; i<depth; i++) {
+    // Prepend line with dashes to indicate depth
+    for (auto i = 0U; i < depth; i++) {
         std::cout << '-';
     }
+    // Then print name of current header
     printString(hdr-> name);
 
-    file_type type =  hdr->type;
+    const file_type& type =  hdr->type;
     //std::cout << "file type: " << type << std::endl;
     
+    // If the file type is a normal file, no need to recurse
     if(type == file_type::PLAIN_FILE)
     {
         return;
     }
+
+    // If the file is a directory, print the contents
     if(type == file_type::DIRECTORY)
     {
         uint64_t init_offset = hdr->offset;
@@ -94,6 +123,9 @@ void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth){
 }
 
 void printString(char* s) {
+
+    // iterate back to front to find first non-space character
+    // i.e. finds the end of the payload string
     int firstNonspace = 255;
     for (int i=254; i>=0; i--) {
         if (s[i] != ' ') {
@@ -102,9 +134,16 @@ void printString(char* s) {
         }
     }
 
+    // Create a buffer that is the same length as the payload string
     char buffer[firstNonspace];
+
+    // copy the argument string to the buffer
     std::string str (s);
     std::size_t length = str.copy(buffer, firstNonspace, 0);
+    
+    // Null-Terminate the buffer
     buffer[length] = '\0';
+
+    // Finally, print the string
     std::cout << buffer << std::endl;
 }
