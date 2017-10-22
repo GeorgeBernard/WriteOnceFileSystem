@@ -159,22 +159,22 @@ int image(){
 
 		if(meta[i].type == PLAIN_FILE){
 			fwrite((char*) &file_offset, sizeof(uint64_t), 1, output);
-			header_offset = header_offset + sizeof(m_hdr);
-
+			header_offset += sizeof(m_hdr);
 
 			// Write actual file to memory
-			fseek(output, file_offset, SEEK_SET);
+			fseek(output, file_offset, SEEK_SET); // start at header
 			char buffer[meta[i].length];
 			size_t bytes;
 
 			while (0 < (bytes = fread(buffer, 1, sizeof(buffer), (FILE*) meta[i].p))){
 				fwrite(buffer, 1, bytes, output);
 			}
-			file_offset = file_offset + meta[i].length;
+			file_offset += meta[i].length;
 			// Move back to header
 			fseek(output, header_offset, SEEK_SET);
-			fclose((FILE*) met[i].p)
+			fclose((FILE*) meta[i].p)
 		}
+
 		else if (meta[i].type == DIRECTORY){
 			// Write Directory Array Values
 			struct dirent* d;
@@ -185,20 +185,16 @@ int image(){
 					perror(d->d_name);
 				}
 				else{
-					//TODO: Store address to correct array header
-
-
+					// Store address to correct array header
+					fwrite((char*) meta[i].p, sizeof(meta[i].p), 1, output);
 				}
 			}
 			closedir(rdir);
 		}
 	}
 	fclose(output);
-
-
 	return 0;
 }
-
 
 uint64_t find_header_size(){
 	uint64_t h_size = header_count * sizeof(m_hdr) + subitems_count * sizeof(uint64_t);
