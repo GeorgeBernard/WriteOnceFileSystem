@@ -1,8 +1,8 @@
-CFLAGS= -Wall -Wextra -std=c++17
+CFLAGS= -Wall -Wextra -std=c++11
 
 ##============================== Infrastructure ==============================##
 
-all: generate.out tree.out
+all: generate.out tree.out master.o old.o
 
 rebuild: clean all
 
@@ -17,4 +17,8 @@ generate.out: generate.cpp
 tree.out: tree.cpp
 	g++ $(CFLAGS) tree.cpp -o tree.out
 
+master.o: Master.cpp
+	g++ $(CFLAGS) Master.cpp -o master.out
 
+old.o: old.cpp
+	g++ $(CFLAGS) old.cpp -o old.out
