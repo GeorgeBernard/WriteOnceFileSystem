@@ -23,8 +23,9 @@ struct metadata_header {
 	uint64_t length;
 	uint64_t time;
 	uint64_t offset;
-
 };
 typedef struct metadata_header m_hdr;
+
+constexpr size_t M_HDR_SIZE = sizeof(m_hdr::name) + sizeof(m_hdr::type) + sizeof(m_hdr::length) + sizeof(m_hdr::time) + sizeof(m_hdr::offset);
 
 #endif

@@ -1,9 +1,9 @@
-CFLAGS= -Wall -Wextra 
+CFLAGS= -Wall -Wextra -std=c++17
 
 all: master.o
 
-master.o: master.cpp
-	g++ $(CFLAGS) master.cpp -o master.out
+master.o: Master.cpp
+	g++ $(CFLAGS) Master.cpp -o master.out
 
 rebuild: clean all
 

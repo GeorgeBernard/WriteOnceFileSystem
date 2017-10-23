@@ -28,15 +28,15 @@ int subitems_count = 0;
 
 int main(int argc, char **argv){
 	// initialize our structure
-	meta = (m_prs*) malloc(MAX_METADATA * sizeof(m_prs));
+	meta = new m_prs;
 	// ensure input is appropriate
 	if(argc < 2){
 		std::cout << "Please input a directory to master." << "\n";
 		return 0;
 	}
 	else if(argc > 2){
-		std::cout << "This program currently only supports mastering a single directory.
-		Package the directories into a single directory and pass that in.  Thanks." << "\n";
+		std::cout << "This program currently only supports mastering a single directory."
+		"Package the directories into a single directory and pass that in.  Thanks." << "\n";
 		return 0;
 	}
 
@@ -84,7 +84,7 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 			if (fstatat(dirfd(rdir), d->d_name, &st, 0) < 0){
 				perror(d->d_name);
 			}
-			else{
+			else if(strstr(d->d_name, ".") != -1 && strstr(d->d_name, "..") != -1){
 				dir_length++;
 			}
 		}
@@ -159,7 +159,7 @@ int image(){
 
 		if(meta[i].type == PLAIN_FILE){
 			fwrite((char*) &file_offset, sizeof(uint64_t), 1, output);
-			header_offset += sizeof(m_hdr);
+			header_offset += M_HDR_SIZE;
 
 			// Write actual file to memory
 			fseek(output, file_offset, SEEK_SET); // start at header
@@ -172,10 +172,15 @@ int image(){
 			file_offset += meta[i].length;
 			// Move back to header
 			fseek(output, header_offset, SEEK_SET);
-			fclose((FILE*) meta[i].p)
+			fclose((FILE*) meta[i].p);
 		}
 
 		else if (meta[i].type == DIRECTORY){
+			// Move header offset one header downward
+			header_offset += M_HDR_SIZE;
+			// Write the header offset to point to next block
+			fwrite((char*) header_offset, sizeof(uint64_t), 1, output);
+
 			// Write Directory Array Values
 			struct dirent* d;
 			DIR* rdir = (DIR*) meta[i].p;
@@ -184,9 +189,22 @@ int image(){
 				if (fstatat(dirfd(rdir), d->d_name, &st, 0) < 0){
 					perror(d->d_name);
 				}
+				// Store address to correct array header
 				else{
-					// Store address to correct array header
-					fwrite((char*) meta[i].p, sizeof(meta[i].p), 1, output);
+					// check whether current or parent directory				
+					if(strstr(d_name, ".") != -1 || strstr(d_name, "..") != -1) {
+						continue;
+					}
+					else {
+						bool is_dir;
+						bool is_file;
+						if (is_file) { 
+							fwrite((char*) meta[i].p, sizeof(meta[i].p), 1, output);
+						}
+						if (is_file) {
+
+						}
+					}
 				}
 			}
 			closedir(rdir);
@@ -198,4 +216,5 @@ int image(){
 
 uint64_t find_header_size(){
 	uint64_t h_size = header_count * sizeof(m_hdr) + subitems_count * sizeof(uint64_t);
+	return h_size;
 }
