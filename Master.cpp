@@ -77,8 +77,9 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 	// store directory metadata
 	if (ftw == FTW_D) { //if directory
 		//get filename
-		const char* file_name = parse_name(path_name);
-		std::cout << "File name: " << file_name << std::endl;
+		const char* file_name = path_name;
+		//const char* file_name = path_name;
+		std::cout << "Dir name: " << file_name << std::endl;
 		// get number of files in directory algo from: https://stackoverflow.com/questions/1723002/how-to-list-all-subdirectories-in-a-given-directory-in-c?answertab=votes#tab-top
 		int dir_length = 0;
 
@@ -89,9 +90,10 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 			if (fstatat(dirfd(rdir), d->d_name, &st, 0) < 0){
 				perror(d->d_name);
 			}
-			else if(strstr(d->d_name, ".") != NULL && strstr(d->d_name, "..") != NULL){
-				dir_length++;
-			}
+			dir_length++;
+			// else if(strstr(d->d_name, ".") != NULL && strstr(d->d_name, "..") != NULL){
+			// 	dir_length++;
+			// }
 		}
 		closedir(rdir);
 
@@ -105,6 +107,10 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 		meta[metadataPointer].length = dir_length;
 		meta[metadataPointer].time = object_info->st_mtime;
 		meta[metadataPointer].p = (void*) opendir(path_name);
+		std::cout << "type: " << meta[metadataPointer].type << std::endl;
+		std::cout << "length: " << meta[metadataPointer].length << std::endl;
+		std::cout << "time: " << meta[metadataPointer].time << std::endl;
+		std::cout << "p: " << meta[metadataPointer].p << std::endl;
 		metadataPointer++;
 		return 0;
 	}
@@ -113,7 +119,7 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 	// Store File Metadata - possibly add in FTW_NS and FTW_SNL functionality for failed symbolic links
 	else if ((ftw == FTW_F) || (ftw == FTW_SL)) {
 		//get filename
-		const char* file_name = parse_name(path_name);
+		const char* file_name = path_name;
 		// assign all values
 		for(int i = 0; i < 255; i++){
 			meta[metadataPointer].name[i] = file_name[i];
@@ -122,6 +128,11 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 		meta[metadataPointer].length = object_info->st_size; // need the size
 		meta[metadataPointer].time = object_info->st_mtime; // time of last modification, could also use atime for last access or ctime for last status change
 		meta[metadataPointer].p = fopen(path_name, "r"); // open the file for reading, when writing to img use this stream
+
+		std::cout << "type: " << meta[metadataPointer].type << std::endl;
+		std::cout << "length: " << meta[metadataPointer].length << std::endl;
+		std::cout << "time: " << meta[metadataPointer].time << std::endl;
+		std::cout << "p: " << meta[metadataPointer].p << std::endl;
 		metadataPointer++;
 		return 0;
 	}
