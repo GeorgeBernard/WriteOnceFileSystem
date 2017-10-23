@@ -123,6 +123,9 @@ uint32_t toBigEndian32(uint32_t value) {
 }
 
 void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth){
+    if (depth > 2) {
+        exit(0);
+    }
 
     // Prepend line with dashes to indicate depth
     for (auto i = 0U; i < depth; i++) {
@@ -130,6 +133,8 @@ void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth){
     }
     // Then print name of current header
     printString(hdr-> name);
+    std::cout << "offset"<< std::endl;
+    std::cout << hdr -> offset << std::endl;
 
     const file_type& type =  hdr->type;
     //std::cout << "file type: " << type << std::endl;
@@ -144,10 +149,11 @@ void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth){
     if(type == file_type::DIRECTORY)
     {
         uint64_t init_offset = hdr->offset;
+        std::cout << "init_offset: " << init_offset << std::endl;
         for(auto i = 0U; i < hdr->length; ++i){
             uint64_t next_offset = init_offset + i*sizeof(uint64_t);
             uint64_t x = readOffset(input, next_offset);
-
+            std::cout << "next_offset: " << x << std::endl;
             m_hdr* sub = new m_hdr;
             sub = readHeader(input, x);
             print_metadata(input, sub, depth+1);

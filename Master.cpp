@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <stdint.h>
 #include <string>
+#include <endian.h>
 
 #include "OnDiskStructure.h"
 
@@ -65,6 +66,7 @@ int main(int argc, char **argv){
 
 // function called on each sub directory/file, updates the global information
 static int s_builder(const char * path_name, const struct stat * object_info, int ftw, struct FTW * data){
+
 		const char* dir_file_name = parse_name(path_name);
 		char firstCharacter = (dir_file_name)[0];
 		if (firstCharacter == '.') {
@@ -135,6 +137,16 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
     return 7; // indicates an error
 }
 
+void write64(uint64_t item, FILE* output) {
+	uint64_t bigEndian = htobe64(item);
+	fwrite((char*) &bigEndian, sizeof(uint64_t), 1, output);
+} 
+
+void write32(uint32_t item, FILE* output) {
+	uint32_t bigEndian = htobe32(item);
+	fwrite((char*) &bigEndian, sizeof(uint32_t), 1, output);
+} 
+
 //returns final token separated by /
 const char* parse_name(const char * path_name){
     std::string s = path_name;
@@ -169,7 +181,7 @@ int image(){
 		std::cout << "name: " << meta[i].name << std::endl;
 		//Write universal information
 
-		char* buffer = new char[255];
+		char* buffer = new char[256];
 		for(auto i = 0U; i < 256; i++){
 			buffer[i] = ' ';
 		}
@@ -184,12 +196,17 @@ int image(){
 		std::cout << std::hex << "time: " << meta[i].time << std::endl;
 		std::cout << std::dec << "type: " << meta[i].type << std::endl;
 		std::cout << std::hex << "type: " << meta[i].type << std::endl;
-		fwrite((char*) &meta[i].length, sizeof(uint64_t), 1, output);
-		fwrite((char*) &meta[i].time, sizeof(uint64_t), 1, output);
-		fwrite((char*) &meta[i].type, sizeof(uint32_t), 1, output );
+		uint64_t reversedLength = htobe64(meta[i].length);
+		uint64_t reversedTime = htobe64(meta[i].time);
+		uint32_t reversedType = htobe32(meta[i].type);
+		fwrite((char*) &reversedLength, sizeof(uint64_t), 1, output);
+		fwrite((char*) &reversedTime, sizeof(uint64_t), 1, output);
+		
 
 		if(meta[i].type == PLAIN_FILE){
-			fwrite((char*) &file_offset, sizeof(uint64_t), 1, output);
+			write64(file_offset, output);
+			write32(meta[i].type, output );
+			//fwrite((char*) &file_offset, sizeof(uint64_t), 1, output);
 			header_offset += M_HDR_SIZE;
 
 			// Write actual file to memory
@@ -211,7 +228,9 @@ int image(){
 			// Move header offset one header downward
 			header_offset += M_HDR_SIZE;
 			// Write the header offset to point to next block
-			fwrite((char*) &header_offset, sizeof(uint64_t), 1, output);
+			write64(header_offset, output);
+			write32(meta[i].type, output );
+			//fwrite((char*) &header_offset, sizeof(uint64_t), 1, output);
 
 			if (end_offset < header_offset) {
 					end_offset = header_offset;
@@ -224,30 +243,42 @@ int image(){
 			struct dirent* d;
 			DIR* rdir = (DIR*) meta[i].p;
 			while((d = readdir(rdir)) != NULL){
+				std::cout << "here" << std::endl;
 				struct stat st;
 				if (fstatat(dirfd(rdir), d->d_name, &st, 0) < 0){
 					perror(d->d_name);
 				}
 				// Store address to correct array header
 				else{
+					std::cout << "name: " << d->d_name << std::endl;
 					// check whether current or parent directory
-					if(strstr(d->d_name, ".") != NULL || strstr(d->d_name, "..") != NULL) {
+					if(d->d_name[0] == '.') {
+						std::cout << "I am continuoing" << std::endl;
+						bool tf = d->d_name[0] == '.';
+						std::cout << "TF: " << tf << std::endl;
 						continue;
 					}
 					else {
+						std::cout << "else" << std::endl;
 						bool is_dir = d->d_type == DT_DIR;
 						bool is_file = d->d_type == DT_REG;
 						if (is_file) {
-							fwrite((char*) &end_offset, sizeof(uint64_t), 1, output);
+							std::cout << std::dec << "end offset: " << end_offset <<  std::endl;
+							write64(end_offset, output);
+							//fwrite((char*) &end_offset, sizeof(uint64_t), 1, output);
 							end_offset += M_HDR_SIZE;
 						}
 						if (is_dir) {
-							fwrite((char*) &end_offset, sizeof(uint64_t), 1, output);
+							std::cout << std::dec <<  "end offset: " << end_offset << std::endl;
+							write64(end_offset, output);
+							//fwrite((char*) &end_offset, sizeof(uint64_t), 1, output);
 							end_offset += M_HDR_SIZE;
-							for (uint64_t j = i; j<= i+meta[i].length; j++) {
+							for (uint64_t j = i; j< i+meta[i].length; j++) {
 								const char* nameSafe = parse_name(d->d_name);
 								if (strstr(nameSafe, meta[j].name)) {
+									std::cout << std::dec << "increment" << meta[j].length << std::endl;
 									 end_offset += meta[j].length * sizeof(uint64_t);
+									 std::cout << std::dec << "after end offset " << end_offset << std::endl;
 								}
 							}
 						}
