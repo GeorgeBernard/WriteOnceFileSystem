@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <ftw.h>
 #include <iostream>
+#include <algorithm>
 #include <stdint.h>
 #include <string>
 
@@ -158,7 +159,7 @@ int image(){
 	std::cout << "file offset: " << file_offset << std::endl;
 
 	FILE *output;
-	output = fopen("./output.wofs", "a"); // open in append mode
+	output = fopen("./output.wofs", "wb");
 
 
 	//write type dependent information
@@ -167,13 +168,25 @@ int image(){
 		std::cout << "i: " << i << std::endl;
 		std::cout << "name: " << meta[i].name << std::endl;
 		//Write universal information
-		fwrite(meta[i].name, sizeof(char), 255, output);
-		char lastChar = '\0';
-		fwrite(&lastChar, sizeof(char), 1, output);
+
+		char* buffer = new char[255];
+		for(auto i = 0U; i < 256; i++){
+			buffer[i] = ' ';
+		}
+		std::string str (meta[i].name);
+		std::size_t length = str.copy(buffer,str.size(),0);
+		buffer[255]='\0';
+
+		fwrite(buffer, sizeof(char), 256, output);
+		std::cout << std::dec << "length: " << meta[i].length << std::endl;
+		std::cout << std::hex << "length: " << meta[i].length << std::endl;
+		std::cout << std::dec << "time: " << meta[i].time << std::endl;
+		std::cout << std::hex << "time: " << meta[i].time << std::endl;
+		std::cout << std::dec << "type: " << meta[i].type << std::endl;
+		std::cout << std::hex << "type: " << meta[i].type << std::endl;
 		fwrite((char*) &meta[i].length, sizeof(uint64_t), 1, output);
 		fwrite((char*) &meta[i].time, sizeof(uint64_t), 1, output);
 		fwrite((char*) &meta[i].type, sizeof(uint32_t), 1, output );
-
 
 		if(meta[i].type == PLAIN_FILE){
 			fwrite((char*) &file_offset, sizeof(uint64_t), 1, output);
