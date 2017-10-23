@@ -1,4 +1,4 @@
-CFLAGS= -Wall -Wextra -std=c++17
+CFLAGS= -Wall -Wextra -std=c++11
 
 all: master.o
 

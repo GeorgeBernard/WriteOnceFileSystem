@@ -7,6 +7,7 @@
 #include <iostream>
 #include <stdint.h>
 #include <string>
+#include <algorithm>
 
 #include "OnDiskStructure.h"
 
@@ -65,15 +66,19 @@ int main(int argc, char **argv){
 
 // function called on each sub directory/file, updates the global information
 static int s_builder(const char * path_name, const struct stat * object_info, int ftw, struct FTW * data){
-	//std::cout << "Called s_builder on:" << "\n";
-	//std::cout << path_name << "\n";
+	std::cout << "Called s_builder on:" << "\n";
+	std::cout << path_name << "\n";
+	std::cout << "ftw: " << ftw << std::endl;
 	header_count++;
+
+	std::cout << "dir: " << FTW_D << std::endl;
+	std::cout << "file: " << FTW_F << std::endl;
 
 	// store directory metadata
 	if (ftw == FTW_D) { //if directory
 		//get filename
 		const char* file_name = parse_name(path_name);
-
+		std::cout << "File name: " << file_name << std::endl;
 		// get number of files in directory algo from: https://stackoverflow.com/questions/1723002/how-to-list-all-subdirectories-in-a-given-directory-in-c?answertab=votes#tab-top
 		int dir_length = 0;
 
@@ -84,7 +89,7 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 			if (fstatat(dirfd(rdir), d->d_name, &st, 0) < 0){
 				perror(d->d_name);
 			}
-			else if(strstr(d->d_name, ".") != -1 && strstr(d->d_name, "..") != -1){
+			else if(strstr(d->d_name, ".") != NULL && strstr(d->d_name, "..") != NULL){
 				dir_length++;
 			}
 		}
@@ -127,6 +132,7 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 
 // returns final token separated by /
 const char* parse_name(const char * path_name){
+	std::cout << "in parse name: " << path_name << std::endl;
 	std::string s = path_name;
 	std::string d = "/";
 	std::string token;
@@ -135,14 +141,21 @@ const char* parse_name(const char * path_name){
 		token = s.substr(0, pos);
 		s.erase(0, pos + d.length());
 	}
-
+	std::cout << "end parse name: " << path_name << std::endl;
 	return s.c_str(); //convert from cpp to c formatted string
+	// char* buffer = new char[s.size()];
+	// std::size_t length = s.copy(buffer, s.size(), 0);
+	// buffer[length]='\0';
+	// std::cout << "end parse name: " << path_name << std::endl;
+	// return buffer;
+
 }
 
 // function to write the file
 int image(){
 	uint64_t header_offset = 0;
 	uint64_t file_offset = find_header_size();
+	uint64_t end_offset = 0;
 
 	FILE *output;
 	output = fopen("./output.wofs", "a"); // open in append mode
@@ -181,6 +194,13 @@ int image(){
 			// Write the header offset to point to next block
 			fwrite((char*) header_offset, sizeof(uint64_t), 1, output);
 
+			if (end_offset < header_offset) {
+					end_offset = header_offset;
+					end_offset += meta[i].length * sizeof(uint64_t);
+			}
+
+			header_offset += meta[i].length * sizeof(uint64_t);
+
 			// Write Directory Array Values
 			struct dirent* d;
 			DIR* rdir = (DIR*) meta[i].p;
@@ -191,18 +211,26 @@ int image(){
 				}
 				// Store address to correct array header
 				else{
-					// check whether current or parent directory				
-					if(strstr(d_name, ".") != -1 || strstr(d_name, "..") != -1) {
+					// check whether current or parent directory
+					if(strstr(d->d_name, ".") != NULL || strstr(d->d_name, "..") != NULL) {
 						continue;
 					}
 					else {
-						bool is_dir;
-						bool is_file;
-						if (is_file) { 
-							fwrite((char*) meta[i].p, sizeof(meta[i].p), 1, output);
-						}
+						bool is_dir = d->d_type == DT_DIR;
+						bool is_file = d->d_type == DT_REG;
 						if (is_file) {
-
+							fwrite((char*) &end_offset, sizeof(uint64_t), 1, output);
+							end_offset += M_HDR_SIZE;
+						}
+						if (is_dir) {
+							fwrite((char*) &end_offset, sizeof(uint64_t), 1, output);
+							end_offset += M_HDR_SIZE;
+							for (uint64_t j = i; j<= i+meta[i].length; j++) {
+								const char* nameSafe = parse_name(d->d_name);
+								if (strstr(nameSafe, meta[j].name)) {
+									 end_offset += meta[j].length * sizeof(uint64_t);
+								}
+							}
 						}
 					}
 				}
