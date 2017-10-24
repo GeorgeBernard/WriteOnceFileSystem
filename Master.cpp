@@ -19,7 +19,7 @@ static int s_builder(const char *, const struct stat *, int, struct FTW *);
 int image();
 int imageDFS(node* root);
 static int display_info(const char *, const struct stat *, int, struct FTW *);
-const char* parse_name(const char *);
+std::string parse_name(const std::string& path_name);
 uint64_t find_header_size();
 
 uint64_t header_off;
@@ -67,6 +67,8 @@ int main(int argc, char **argv){
 
             // flags to specialize usage, we aren't using any right now
     int result =  nftw(argv[1], s_builder, MAX_METADATA, 0);
+    std::cout << "after nftw" << std::endl;
+
 
     //iterate to real root
     node root = head->children[0];
@@ -76,20 +78,30 @@ int main(int argc, char **argv){
     int i = 0;
 
     // write the tree to an array  this should be put in a separate method later
+     std::cout << "before we convert" << std::endl;
     std::queue<node> q;
     q.push(root);
     while(!q.empty()){
+        std::cout << "before got data" <<std::endl;
         node t = q.front();
+        std::cout << "got node" << std::endl;
         q.pop();
+        std::cout << "q.pop" <<std::endl;
         meta[i] = *t.data;
+        std::cout << "name: " << t.data -> name << std::endl;
+        std::cout << "got the data" << std::endl;
         i++;
         // if not a file recurs through sub files/directories
         if(t.fill != -1){
+            std::cout << "i am not a file " << std::endl;
             for(int j = 0; j < t.data->length; j++){
+                std::cout << "pushing: " << t.children[j].data -> name << std::endl;
                 q.push(t.children[j]);
             }
+            std::cout << "after loop" << std::endl;
         }
     }
+    std::cout << "after we convert" << std::endl;
 
     //return 0;
     // Write the BFS structure for testing purposes.
@@ -105,16 +117,21 @@ int main(int argc, char **argv){
     // Now write the file to a structure
     node* r = new node;
     *r =  head->children[0];
+    //std::cout << "before we image" << std::endl;
     int imageStatus = imageDFS(r);
+      // std::cout << "after we image" << std::endl;
 	return 0;
 }
 
 // function called on each sub directory/file, updates the global information
 static int s_builder(const char * path_name, const struct stat * object_info, int ftw, struct FTW * data){
 
-	const char* dir_file_name = parse_name(path_name);
-	char firstCharacter = (dir_file_name)[0];
-	if (firstCharacter == '.') {
+    std::cout << path_name << std::endl;
+    const auto name = parse_name(path_name);
+    const char* dir_file_name = name.c_str();
+    std::cout << dir_file_name << std::endl;
+    
+	if (name == "." || name == "..") {
 		return 0;
 	}
 
@@ -122,6 +139,7 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 	// store directory metadata
 	if(ftw == FTW_D){
 
+        // std::cout << "im a directory" << std::endl;
 		//get filename
       const char* dir_name = dir_file_name;
 			char* buffer = new char[255];
@@ -169,6 +187,9 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
             directories.pop();
 
             //write child information
+            // child = parent.children[parent.fill]
+            // std::cout << "added child: " << h -> name << " to: " 
+                // << parent.data -> name << " at " << parent.fill << std::endl;
             parent.children[parent.fill].data = h;
             parent.children[parent.fill].fill = 0;
             parent.children[parent.fill].children = new node[h->length];
@@ -176,16 +197,22 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
             //update the "fill" value
             parent.fill = parent.fill + 1;
 
-            // if not full add it back to the stack
+            // if not parent not full add parent back to the stack
             if(parent.fill != parent.data->length){
+                // std::cout << "adding " << parent.data -> name << " back to stack " << std::endl;
                 directories.push(parent);
             }
              // add this directory to the stack
-            directories.push(parent.children[parent.fill-1]);
+
+            // Add ourself to the stack only if we have children
+            if(parent.children[parent.fill-1].data->length != 0){
+                directories.push(parent.children[parent.fill-1]);
+            }
+           
         }
 
-
-        //keep total size
+        // std::cout << "end of im a dir" << std::endl;
+                //keep total size
 		metadataPointer++;
         return 0;
 	}
@@ -248,7 +275,7 @@ void write32(uint32_t item, FILE* output) {
 
 
 //returns final token separated by /
-const char* parse_name(const char * path_name){
+std::string parse_name(const std::string& path_name){
     std::string s = path_name;
     std::string d = "/";
     std::string token;
@@ -258,12 +285,12 @@ const char* parse_name(const char * path_name){
         s.erase(0, pos + d.length());
     }
 
-    return s.c_str();
+    return s;
 }
 
 uint64_t writeDFS(node* node, FILE* output) {
 
-	std::cout << "node name: " << node -> data->name << std::endl;
+	// std::cout << "node name: " << node -> data->name << std::endl;
 	uint64_t currentOffset = header_off;
 
 	fseek(output, currentOffset, SEEK_SET);
@@ -279,7 +306,7 @@ uint64_t writeDFS(node* node, FILE* output) {
 
 	if (node -> fill == -1) {
 		// File
-		std::cout << "im a file" << std::endl;
+		// std::cout << "im a file" << std::endl;
 		write64(node->data->length, output);
 		write64(node->data->time, output);
 		write64(file_off, output);
@@ -447,8 +474,8 @@ int image(){
 							//fwrite((char*) &end_offset, sizeof(uint64_t), 1, output);
 							end_offset += M_HDR_SIZE;
 							for (uint64_t j = i; j< i+meta[i].length; j++) {
-								const char* nameSafe = parse_name(d->d_name);
-								if (strstr(nameSafe, meta[j].name)) {
+								const auto nameSafe = parse_name(d->d_name);
+								if (strstr(nameSafe.c_str(), meta[j].name)) {
 									std::cout << std::dec << "increment" << meta[j].length << std::endl;
 									 end_offset += meta[j].length * sizeof(uint64_t);
 									 std::cout << std::dec << "after end offset " << end_offset << std::endl;
