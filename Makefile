@@ -2,7 +2,7 @@ CFLAGS=  -std=c++11
 
 ##============================== Infrastructure ==============================##
 
-all: generate.out tree.out master.o old.o
+all: generate.out tree.out master.o
 
 rebuild: clean all
 
