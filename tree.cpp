@@ -124,10 +124,15 @@ uint32_t toBigEndian32(uint32_t value) {
 
 void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth){
 
+    static const std::string empty = "    ";
+    static const std::string child_line = "|___";
+
     // Prepend line with dashes to indicate depth
     for (auto i = 0U; i < depth; i++) {
-        std::cout << '-';
+        if(i > 0) { std::cout << empty; }
     }
+    std::cout << child_line;
+
     // Then print name of current header
     printString(hdr-> name);
 
