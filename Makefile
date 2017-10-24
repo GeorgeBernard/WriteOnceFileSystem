@@ -19,6 +19,3 @@ tree.out: tree.cpp
 
 master.o: Master.cpp
 	g++ $(CFLAGS) Master.cpp -o master.out
-
-old.o: old.cpp
-	g++ $(CFLAGS) old.cpp -o old.out
