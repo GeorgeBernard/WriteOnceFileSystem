@@ -1,4 +1,4 @@
-CFLAGS= -Wall -Wextra -std=c++11
+CFLAGS=  -std=c++11
 
 ##============================== Infrastructure ==============================##
 

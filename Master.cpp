@@ -17,10 +17,13 @@
 
 static int s_builder(const char *, const struct stat *, int, struct FTW *);
 int image();
+int imageDFS(node* root);
 static int display_info(const char *, const struct stat *, int, struct FTW *);
 const char* parse_name(const char *);
 uint64_t find_header_size();
 
+uint64_t header_off;
+uint64_t file_off;
 
 const int MAX_METADATA = 1000;
 
@@ -88,18 +91,21 @@ int main(int argc, char **argv){
         }
     }
 
+    //return 0;
     // Write the BFS structure for testing purposes.
     for(int i = 0; i < metadataPointer; i++){
-        std::cout << meta[i].name << "\n";
-        std::cout << meta[i].type << "\n";
-        std::cout << meta[i].length << "\n";
+        //std::cout << meta[i].name << "\n";
+        //std::cout << meta[i].type << "\n";
+        //std::cout << meta[i].length << "\n";
     }
-    std::cout << header_count << "\n";
-    std::cout << subitems_count << "\n";
+    //std::cout << header_count << "\n";
+    //std::cout << subitems_count << "\n";
 
-
+    //return 0;
     // Now write the file to a structure
-    int imageStatus = image();
+    node* r = new node;
+    *r =  head->children[0];
+    int imageStatus = imageDFS(r);
 	return 0;
 }
 
@@ -187,17 +193,24 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 	else if((ftw == FTW_F) || (ftw == FTW_SL)){
 		//get filename
         const char* file_name = dir_file_name;
-
+        char* buffer = new char[255];
+ 			std::string str (file_name);
+ 			std::size_t length = str.copy(buffer,255,0);
+ 			buffer[length]='\0';
+ 			//std::cout << "buffer: " << buffer << std::endl;
+        //std::cout << "file name: " << file_name << std::endl;
+        
+       
 		// assign all values
         m_prs* h = new m_prs;
         for(int i =0; i < 255; i++){
-            h->name[i] = file_name[i];
+            h->name[i] = buffer[i];
         }
         h->type = PLAIN_FILE;
 		h->length = object_info->st_size;
 		h->time = object_info->st_mtime; // time of last modification, could also use atime for last access or ctime for last status change
 		h->p = fopen(path_name, "r"); // open the file for reading, when writing to img use this stream
-
+		//std::cout << "h name: " << h->name << std::endl;
         // add to the tree
         if(!directories.empty()){
             // get parent node
@@ -233,6 +246,7 @@ void write32(uint32_t item, FILE* output) {
 	fwrite((char*) &bigEndian, sizeof(uint32_t), 1, output);
 }
 
+
 //returns final token separated by /
 const char* parse_name(const char * path_name){
     std::string s = path_name;
@@ -245,6 +259,79 @@ const char* parse_name(const char * path_name){
     }
 
     return s.c_str();
+}
+
+uint64_t writeDFS(node* node, FILE* output) {
+
+	std::cout << "node name: " << node -> data->name << std::endl;
+	uint64_t currentOffset = header_off;
+
+	fseek(output, currentOffset, SEEK_SET);
+	char* buffer = new char[256];
+	for(auto i = 0U; i < 256; i++){
+		buffer[i] = ' ';
+	}
+	std::string str (node -> data -> name);
+	std::size_t length = str.copy(buffer,str.size(),0);
+	buffer[255]='\0';
+
+	fwrite(buffer, sizeof(char), 256, output);
+
+	if (node -> fill == -1) {
+		// File
+		std::cout << "im a file" << std::endl;
+		write64(node->data->length, output);
+		write64(node->data->time, output);
+		write64(file_off, output);
+		write32(node->data->type, output );
+		std::cout << "file offset: " << file_off << std::endl;
+		fseek(output, file_off, SEEK_SET); // start at header
+
+		uint64_t fileSize = node -> data -> length;
+		char buffer[fileSize];
+		size_t bytes;
+
+		while (0 < (bytes = fread(buffer, 1, sizeof(buffer), (FILE*) node -> data -> p))){
+			fwrite(buffer, 1, bytes, output);
+		}
+		file_off += fileSize;
+		header_off += M_HDR_SIZE;
+		
+	} else if (node -> fill == 0) {
+		// DIR
+		std::cout << "im a dir" << std::endl;
+
+		write64(node->data->length, output);
+		write64(node->data->time, output);
+		uint64_t endOffset = currentOffset + M_HDR_SIZE;
+		write64(endOffset, output);
+		write32(node->data->type, output );
+
+		uint64_t numChildren = node -> data -> length;
+		header_off = endOffset + sizeof(uint64_t) * numChildren;
+
+		for (int i = 0; i<numChildren; i++) {
+			tree_node child = (node -> children)[i];
+			uint64_t childOffset = writeDFS(&child, output);
+			uint64_t desiredSeekLoc = endOffset + i * sizeof(uint64_t);
+			fseek(output, desiredSeekLoc, SEEK_SET); 
+			write64(childOffset, output);
+		}
+	}
+	return currentOffset;
+}
+
+int imageDFS(node* root) {
+	header_off = 0;
+	file_off = find_header_size();
+	std::cout << "original final off: " << file_off << std::endl;
+
+	FILE *output;
+	output = fopen("./output.wofs", "wb");
+
+	std::cout << "root name: " << root -> data->name << std::endl;
+	writeDFS(root, output);
+	fclose(output);
 }
 
 // function to write the file
@@ -382,6 +469,8 @@ int image(){
 uint64_t find_header_size(){
 		std::cout << "header_count: " << header_count << std::endl;
 		std::cout << "subitems_count: " << subitems_count << std::endl;
-    uint64_t h_size = header_count * M_HDR_SIZE + subitems_count * sizeof(uint64_t);
+		std::cout << "header size: " << (M_HDR_SIZE) << std::endl;
+    	uint64_t h_size = header_count * M_HDR_SIZE + subitems_count * sizeof(uint64_t);
+    	std::cout << "h size: " << h_size << std::endl;
 		return h_size;
 }

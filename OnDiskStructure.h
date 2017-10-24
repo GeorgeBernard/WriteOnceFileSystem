@@ -40,6 +40,6 @@ struct tree_node {
 };
 typedef struct tree_node node;
 
-#define M_HDR_SIZE sizeof(m_hdr::name) + sizeof(m_hdr::type) + sizeof(m_hdr::length) + sizeof(m_hdr::time) + sizeof(m_hdr::offset);
+#define M_HDR_SIZE (sizeof(m_hdr::name) + sizeof(m_hdr::type) + sizeof(m_hdr::length) + sizeof(m_hdr::time) + sizeof(m_hdr::offset))
 
 #endif
