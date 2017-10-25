@@ -2,7 +2,7 @@ CFLAGS=  -std=c++11
 
 ##============================== Infrastructure ==============================##
 
-all: generate.out tree.out master.o
+all: generate.out tree.out master.out
 
 rebuild: clean all
 
@@ -17,5 +17,5 @@ generate.out: generate.cpp
 tree.out: tree.cpp
 	g++ $(CFLAGS) tree.cpp -o tree.out
 
-master.o: Master.cpp
+master.out: Master.cpp
 	g++ $(CFLAGS) Master.cpp -o master.out

@@ -16,7 +16,6 @@ struct metadata_parse {
 };
 typedef struct metadata_parse m_prs;
 
-
 struct metadata_header {
     char name[256];
     uint64_t length;
@@ -25,13 +24,6 @@ struct metadata_header {
     enum file_type type;
 };
 typedef struct metadata_header m_hdr;
-
-struct metadata_test {
-    uint64_t a;
-    uint32_t b;
-    uint64_t c;
-};
-typedef struct metadata_test m_test;
 
 struct tree_node {
     m_prs* data;

@@ -18,7 +18,7 @@
     @param hdr: the root metadata header from which to print down from
     @param depth: the depth for which you call the print recursion
 */
-void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth);
+void print_metadata(std::fstream& input, const m_hdr& hdr, unsigned int depth);
 
 /** 
     Converts value from little endian to big endian (i.e. reverses it)
@@ -48,17 +48,43 @@ uint64_t readOffset(std::fstream& input, uint64_t offset);
         value
     @return header at offset
 */
-m_hdr* readHeader(std::fstream& input, uint64_t offset);
+m_hdr readHeader(std::fstream& input, uint64_t offset);
 
 /**
-    Prints just the payload string in a space padded buffer
+    Prints just the header and optionally file metadata/data
     
     @param s: the pointer to the first character in the space padded buffer
     @return the payload string within the space padded buffer   
 */
-void printString(char* s);
+void printHeader(std::fstream& input, const m_hdr& hdr, const int depth);
+
+/**
+    Trims spaces from beginning and end of a string
+
+    @param s: the string input
+    @return the trimmed string
+*/
+std::string trimSpaces(const std::string& s);
+
+/**
+    Converts a string of unix time to human readable Y-M-D H:M:S
+
+    @param time: the date time object
+    @return the human readable date time string
+*/
+std::string unixTimeToHumanTime(const time_t& time);
+
+
+//============================== Static Globals ==============================//
+
+static bool disp_verbose;
+static bool disp_content;
+
+static const std::string empty = "    ";
+static const std::string child_line = "|___";
 
 //=========================== Function Definitions ===========================//
+
 
 int main(int argc, char* argv[])
 {
@@ -68,9 +94,22 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
+    if (argc > 3) {
+        std::cout << "Too many arguments!" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    if (argc == 3){
+        std::string flag = argv[1];
+        disp_verbose = (flag == "-v") || (flag == "-vc");
+        disp_content = (flag == "-vc");
+    }
+
     // Create file stream, and open with user given filename
     std::fstream input;
-    char* filename = argv[1];
+    const std::string filename = (argc == 2) 
+                               ? argv[1] 
+                               : argv[2];
     input.open(filename, std::ios::in | std::ios::binary);
 
     // Check if file was properly opened
@@ -81,63 +120,58 @@ int main(int argc, char* argv[])
 
     // Set stream position to zero, and get first header 
     input.seekg(0);
-    m_hdr* root_ptr = readHeader(input, 0);
+    m_hdr root_ptr = readHeader(input, 0);
     print_metadata(input, root_ptr, 0);
 
     // Cleanup and return
-    delete root_ptr;
     return EXIT_SUCCESS;
-}
+} // end main
 
-m_hdr* readHeader(std::fstream& input, uint64_t offset) {
+m_hdr readHeader(std::fstream& input, uint64_t offset) {
 
     // Instantiate new header
-    m_hdr* header = new m_hdr;
+    m_hdr header;
 
     // Read the header data starting at the offset
     input.seekg(offset);
-    input.read((char*)header, sizeof(m_hdr));
+    input.read(reinterpret_cast<char*>(&header), sizeof(m_hdr));
 
     // Set data values in output header
-    header -> type   = (file_type) toBigEndian32(header -> type);
-    header -> length = toBigEndian64(header -> length);
-    header -> time   = toBigEndian64(header -> time);
-    header -> offset = toBigEndian64(header -> offset);
+    header.type   = (file_type) toBigEndian32(header.type);
+    header.length = toBigEndian64(header.length);
+    header.time   = toBigEndian64(header.time);
+    header.offset = toBigEndian64(header.offset);
 
     return header;
-}
+} // end readHeader
 
 uint64_t readOffset(std::fstream& input, uint64_t offset) {
     input.seekg(offset);
     uint64_t read_offset;
     input.read((char*)&read_offset, sizeof(uint64_t));
     return toBigEndian64(read_offset);
-}
+} // end readOffset
 
 uint64_t toBigEndian64(uint64_t value) {
     return htobe64(value);
-}
+} // end toBigEndian64
 
 uint32_t toBigEndian32(uint32_t value) {
     return htobe32(value);
-}
+} // end toBigEndian32
 
-void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth){
-
-    static const std::string empty = "    ";
-    static const std::string child_line = "|___";
+void print_metadata(std::fstream& input, const m_hdr& hdr, unsigned int depth){
 
     // Prepend line with dashes to indicate depth
-    for (auto i = 0U; i < depth; i++) {
-        if(i > 0) { std::cout << empty; }
+    for (auto i = 1U; i < depth; i++) {
+        std::cout << empty; 
     }
-    std::cout << child_line;
+    if(depth > 0) { std::cout << child_line; }
 
     // Then print name of current header
-    printString(hdr-> name);
+    printHeader(input, hdr, depth);
 
-    const file_type& type =  hdr->type;
-    //std::cout << "file type: " << type << std::endl;
+    const file_type& type = hdr.type;
     
     // If the file type is a normal file, no need to recurse
     if(type == file_type::PLAIN_FILE)
@@ -148,44 +182,67 @@ void print_metadata(std::fstream& input, m_hdr* hdr, unsigned int depth){
     // If the file is a directory, print the contents
     if(type == file_type::DIRECTORY)
     {
-        uint64_t init_offset = hdr->offset;
-       // std::cout << "init_offset: " << init_offset << std::endl;
-        for(auto i = 0U; i < hdr->length; ++i){
-            uint64_t next_offset = init_offset + i*sizeof(uint64_t);
-            uint64_t x = readOffset(input, next_offset);
-           // std::cout << "next_offset: " << x << std::endl;
-            m_hdr* sub = new m_hdr;
-            sub = readHeader(input, x);
-            print_metadata(input, sub, depth+1);
+        uint64_t init_offset = hdr.offset;
 
-            // Cleanup
-            delete sub;
+        for(auto i = 0U; i < hdr.length; ++i){
+            uint64_t next_offset = init_offset + i*sizeof(uint64_t);
+            uint64_t next_header_block = readOffset(input, next_offset);
+            
+            m_hdr sub = readHeader(input, next_header_block);
+            print_metadata(input, sub, depth+1);
         }
+    }
+} // end print_metadata
+
+void printHeader(std::fstream& input, const m_hdr& hdr, const int depth) {
+
+    std::cout << trimSpaces(hdr.name) << std::endl;
+
+    if (disp_verbose) {
+        for (auto i = 0U; i < depth; i++) {
+            std::cout << empty; 
+        }
+        std::cout << " *Time: " << unixTimeToHumanTime(hdr.time) << std::endl;
+
+        if (hdr.type == PLAIN_FILE) {
+            for (auto i = 0U; i < depth; i++) {
+                std::cout << empty; 
+            }
+            std::cout << " *Size: " << hdr.length << " B" << std::endl;
+        }
+    }
+    if (disp_content && (hdr.type == PLAIN_FILE)) {
+        
+        // Create and reserve size of file
+        char buffer[hdr.length];
+
+        // Seek to beginning of file
+        input.seekg(hdr.offset);
+        input.read(reinterpret_cast<char*>(&buffer), sizeof(buffer));
+
+        for (auto i = 0U; i < depth; i++) {
+            std::cout << empty; 
+        }
+
+        std::cout << " *Contents: " << trimSpaces(buffer) << std::endl;
     }
 }
 
-void printString(char* s) {
+std::string unixTimeToHumanTime(const time_t& time)
+{
+    struct tm * datetime;
+    char buffer [30];
+    datetime = localtime(&time);
+    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", datetime);
+    return std::string(buffer);
+}
 
-    // iterate back to front to find first non-space character
-    // i.e. finds the end of the payload string
-    int firstNonspace = 255;
-    for (int i=254; i>=0; i--) {
-        if (s[i] != ' ') {
-            firstNonspace = i+1;
-            break;
-        }
-    }
+std::string trimSpaces(const std::string& s){
 
-    // Create a buffer that is the same length as the payload string
-    char buffer[firstNonspace];
+    const auto firstScan = s.find_first_not_of(' ');
+    const auto first = firstScan == std::string::npos ? s.length() : firstScan;
 
-    // copy the argument string to the buffer
-    std::string str (s);
-    std::size_t length = str.copy(buffer, firstNonspace, 0);
-    
-    // Null-Terminate the buffer
-    buffer[length] = '\0';
+    const auto last = s.find_last_not_of(' ');
 
-    // Finally, print the string
-    std::cout << buffer << std::endl;
+    return s.substr(first, last-first+1);
 }
