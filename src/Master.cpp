@@ -11,10 +11,13 @@
 #include <endian.h>
 #include <stack>
 #include <queue>
+#include <cxxopts.hpp>
+
 
 #include "OnDiskStructure.h"
 
 static int s_builder(const char *, const struct stat *, int, struct FTW *);
+int run(std::string, std::string);
 
 int imageDFS(const std::string& out_filename, node* root);
 uint64_t writeDFS(node* node, FILE* output);
@@ -23,6 +26,9 @@ std::string parse_name(const std::string& path_name);
 std::string space_pad(const std::string& s);
 
 uint64_t find_header_size();
+
+void write64(uint64_t, FILE*);
+void write32(uint32_t, FILE*); 
 
 static uint64_t header_off;
 static uint64_t file_off;
@@ -39,19 +45,41 @@ std::stack<node> directories;
 int main(int argc, char **argv){
 
 	// ensure input is appropriate
-    if(argc != 3){
-        if(argc < 2){
-        	std::cout << "First argument must be a directory to master." << '\n';
+    // if(argc != 3){
+    //     if(argc < 2){
+    //     	std::cout << "First argument must be a directory to master." << '\n';
+    //     }
+    //     if(argc < 3){
+    //     	std::cout << "Second argument must be an output filename" << '\n';
+    //     }
+    //     return EXIT_FAILURE;
+    // }
+    try{
+        cxxopts::Options options("Master", "Takes in a directory and outputs an imaged File System");
+        options.add_options()
+            ("o,output", "Name of output filename", cxxopts::value<std::string>());
+            ("p,path", "relative path to directory to master", cxxopts::value<std::string>());
+        options.parse(argc, argv);
+
+        if(options.count("output")!=1){
+            std::cout << "please enter an output file name" << std::endl;
+            return 0;
         }
-        if(argc < 3){
-        	std::cout << "Second argument must be an output filename" << '\n';
+        if(options.count("path")!=1){
+            std::cout << "please enter a directory to parse" << std::endl;
+            return 0;
         }
-        return EXIT_FAILURE;
+        run(options["path"].as<std::string>(), options["output"].as<std::string>());
     }
+    catch{
+        std::cout << "error parsing options: " << e.what() << std::endl;
+        exit(1);
+    }
+    
+}
 
-    const std::string root_directory = argv[1];
-    const std::string wofs_filename  = argv[2]; 
-
+int run(std::string root_directory, std::string wofs_filename){
+   
     //make dummy head node to store ptr to root of the tree
     m_prs h;
     h.type = DIRECTORY;
@@ -70,7 +98,7 @@ int main(int argc, char **argv){
               << std::endl;
 
     // Using the nftw() funtion to update global structure
-    //	see here: https://www.ibm.com/support/knowledgecenter/en/SSLTBW_2.3.0/com.ibm.zos.v2r3.bpxbd00/rnftw.htm
+    //  see here: https://www.ibm.com/support/knowledgecenter/en/SSLTBW_2.3.0/com.ibm.zos.v2r3.bpxbd00/rnftw.htm
             // filepath
             // function to call on each directory/file
             // max number of directories that can be used
@@ -108,7 +136,7 @@ int main(int argc, char **argv){
     node* r = &root;
     int imageStatus = imageDFS(wofs_filename, r);
 
-	return 0;
+    return 0;
 }
 
 // function called on each sub directory/file, updates the global information
