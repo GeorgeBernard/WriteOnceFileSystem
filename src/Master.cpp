@@ -56,8 +56,9 @@ int main(int argc, char **argv){
   try{
     cxxopts::Options options("Master", "Takes in a directory and outputs an imaged File System");
     options.add_options()
-    ("o,output", "Name of output filename", cxxopts::value<std::string>());
-    ("p,path", "relative path to directory to master", cxxopts::value<std::string>());
+    ("o,output", "Name of output filename", cxxopts::value<std::string>())
+    ("p,path", "relative path to directory to master", cxxopts::value<std::string>())
+    ;
     options.parse(argc, argv);
 
     if(options.count("output")!=1){
