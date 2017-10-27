@@ -11,7 +11,7 @@
 #include <endian.h>
 #include <stack>
 #include <queue>
-//#include <cxxopts.hpp>
+#include <cxxopts.hpp>
 
 #include "OnDiskStructure.h"
 
