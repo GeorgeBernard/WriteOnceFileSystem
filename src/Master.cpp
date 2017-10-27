@@ -11,8 +11,8 @@
 #include <endian.h>
 #include <stack>
 #include <queue>
-#include "cxxopts.hpp"
 
+#include "cxxopts.hpp"
 #include "OnDiskStructure.h"
 
 static int s_builder(const char *, const struct stat *, int, struct FTW *);
