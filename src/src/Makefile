@@ -135,14 +135,14 @@ test/fast: test
 
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/vcm/WriteOnceFileSystem/src/CMakeFiles /home/vcm/WriteOnceFileSystem/src/CMakeFiles/progress.marks
-	$(MAKE) -f CMakeFiles/Makefile2 all
+	cd /home/vcm/WriteOnceFileSystem/src && $(CMAKE_COMMAND) -E cmake_progress_start /home/vcm/WriteOnceFileSystem/src/CMakeFiles /home/vcm/WriteOnceFileSystem/src/src/CMakeFiles/progress.marks
+	cd /home/vcm/WriteOnceFileSystem/src && $(MAKE) -f CMakeFiles/Makefile2 src/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/vcm/WriteOnceFileSystem/src/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	$(MAKE) -f CMakeFiles/Makefile2 clean
+	cd /home/vcm/WriteOnceFileSystem/src && $(MAKE) -f CMakeFiles/Makefile2 src/clean
 .PHONY : clean
 
 # The main clean target
@@ -152,31 +152,60 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	$(MAKE) -f CMakeFiles/Makefile2 preinstall
+	cd /home/vcm/WriteOnceFileSystem/src && $(MAKE) -f CMakeFiles/Makefile2 src/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	$(MAKE) -f CMakeFiles/Makefile2 preinstall
+	cd /home/vcm/WriteOnceFileSystem/src && $(MAKE) -f CMakeFiles/Makefile2 src/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	$(CMAKE_COMMAND) -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	cd /home/vcm/WriteOnceFileSystem/src && $(CMAKE_COMMAND) -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
 
-#=============================================================================
-# Target rules for targets named example
+# Convenience name for target.
+src/CMakeFiles/example.dir/rule:
+	cd /home/vcm/WriteOnceFileSystem/src && $(MAKE) -f CMakeFiles/Makefile2 src/CMakeFiles/example.dir/rule
+.PHONY : src/CMakeFiles/example.dir/rule
 
-# Build rule for target.
-example: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 example
+# Convenience name for target.
+example: src/CMakeFiles/example.dir/rule
+
 .PHONY : example
 
 # fast build rule for target.
 example/fast:
-	$(MAKE) -f src/CMakeFiles/example.dir/build.make src/CMakeFiles/example.dir/build
+	cd /home/vcm/WriteOnceFileSystem/src && $(MAKE) -f src/CMakeFiles/example.dir/build.make src/CMakeFiles/example.dir/build
 .PHONY : example/fast
+
+example.o: example.cpp.o
+
+.PHONY : example.o
+
+# target to build an object file
+example.cpp.o:
+	cd /home/vcm/WriteOnceFileSystem/src && $(MAKE) -f src/CMakeFiles/example.dir/build.make src/CMakeFiles/example.dir/example.cpp.o
+.PHONY : example.cpp.o
+
+example.i: example.cpp.i
+
+.PHONY : example.i
+
+# target to preprocess a source file
+example.cpp.i:
+	cd /home/vcm/WriteOnceFileSystem/src && $(MAKE) -f src/CMakeFiles/example.dir/build.make src/CMakeFiles/example.dir/example.cpp.i
+.PHONY : example.cpp.i
+
+example.s: example.cpp.s
+
+.PHONY : example.s
+
+# target to generate assembly for a file
+example.cpp.s:
+	cd /home/vcm/WriteOnceFileSystem/src && $(MAKE) -f src/CMakeFiles/example.dir/build.make src/CMakeFiles/example.dir/example.cpp.s
+.PHONY : example.cpp.s
 
 # Help Target
 help:
@@ -188,10 +217,13 @@ help:
 	@echo "... install"
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
+	@echo "... example"
 	@echo "... install/strip"
 	@echo "... install/local"
 	@echo "... test"
-	@echo "... example"
+	@echo "... example.o"
+	@echo "... example.i"
+	@echo "... example.s"
 .PHONY : help
 
 
@@ -203,6 +235,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	$(CMAKE_COMMAND) -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	cd /home/vcm/WriteOnceFileSystem/src && $(CMAKE_COMMAND) -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

@@ -89,17 +89,6 @@ rebuild_cache/fast: rebuild_cache
 
 .PHONY : rebuild_cache/fast
 
-# Special rule for the target edit_cache
-edit_cache:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "No interactive CMake dialog available..."
-	/usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
-.PHONY : edit_cache
-
-# Special rule for the target edit_cache
-edit_cache/fast: edit_cache
-
-.PHONY : edit_cache/fast
-
 # Special rule for the target install/strip
 install/strip: preinstall
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing the project stripped..."
@@ -133,16 +122,27 @@ test/fast: test
 
 .PHONY : test/fast
 
+# Special rule for the target edit_cache
+edit_cache:
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "No interactive CMake dialog available..."
+	/usr/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+.PHONY : edit_cache
+
+# Special rule for the target edit_cache
+edit_cache/fast: edit_cache
+
+.PHONY : edit_cache/fast
+
 # The main all target
 all: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/vcm/WriteOnceFileSystem/src/CMakeFiles /home/vcm/WriteOnceFileSystem/src/CMakeFiles/progress.marks
-	$(MAKE) -f CMakeFiles/Makefile2 all
+	cd /home/vcm/WriteOnceFileSystem/src && $(CMAKE_COMMAND) -E cmake_progress_start /home/vcm/WriteOnceFileSystem/src/CMakeFiles /home/vcm/WriteOnceFileSystem/src/test/CMakeFiles/progress.marks
+	cd /home/vcm/WriteOnceFileSystem/src && $(MAKE) -f CMakeFiles/Makefile2 test/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/vcm/WriteOnceFileSystem/src/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	$(MAKE) -f CMakeFiles/Makefile2 clean
+	cd /home/vcm/WriteOnceFileSystem/src && $(MAKE) -f CMakeFiles/Makefile2 test/clean
 .PHONY : clean
 
 # The main clean target
@@ -152,31 +152,18 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	$(MAKE) -f CMakeFiles/Makefile2 preinstall
+	cd /home/vcm/WriteOnceFileSystem/src && $(MAKE) -f CMakeFiles/Makefile2 test/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	$(MAKE) -f CMakeFiles/Makefile2 preinstall
+	cd /home/vcm/WriteOnceFileSystem/src && $(MAKE) -f CMakeFiles/Makefile2 test/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	$(CMAKE_COMMAND) -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	cd /home/vcm/WriteOnceFileSystem/src && $(CMAKE_COMMAND) -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
-
-#=============================================================================
-# Target rules for targets named example
-
-# Build rule for target.
-example: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 example
-.PHONY : example
-
-# fast build rule for target.
-example/fast:
-	$(MAKE) -f src/CMakeFiles/example.dir/build.make src/CMakeFiles/example.dir/build
-.PHONY : example/fast
 
 # Help Target
 help:
@@ -187,11 +174,10 @@ help:
 	@echo "... list_install_components"
 	@echo "... install"
 	@echo "... rebuild_cache"
-	@echo "... edit_cache"
 	@echo "... install/strip"
 	@echo "... install/local"
 	@echo "... test"
-	@echo "... example"
+	@echo "... edit_cache"
 .PHONY : help
 
 
@@ -203,6 +189,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	$(CMAKE_COMMAND) -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	cd /home/vcm/WriteOnceFileSystem/src && $(CMAKE_COMMAND) -H$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 
