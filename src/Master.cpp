@@ -71,7 +71,8 @@ int main(int argc, char **argv){
     run(options["path"].as<std::string>(), options["output"].as<std::string>());
   }
   catch (...) {
-    std::cout << "error occured" << std::endl;
+    std::exception_ptr p = std::current_exception();
+    std::clog <<(p ? p.__cxa_exception_type()->name() : "null") << std::endl;
     exit(1);
   }
 
