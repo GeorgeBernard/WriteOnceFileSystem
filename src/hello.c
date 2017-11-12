@@ -109,14 +109,73 @@ static m_hdr* readHeader(FILE* fp, uint64_t curr_offset) {
 
 	m_hdr* header = (m_hdr*) malloc(sizeof(m_hdr));
 
-	header -> name = root_name;
+	//header -> name = root_name;
+	strncpy(header -> name, root_name, 256);
+	//printf("headerName: %s \n", header -> name);
 	header-> length = length2;
 	header -> offset = offset2;
 	header -> type = type2;
 	return header;
 }
 
-static void find(const char* path, FILE* fp) {
+static uint64_t readOffset(FILE* fp, uint64_t offset) {
+	fseek(fp, (long) offset, SEEK_SET);
+	uint64_t o;
+	fread((void*)&o, 8, 1, fp);
+	return htobe64(o);	
+}
+
+static m_hdr* find(const char* path, FILE* fp) {
+	if (path == NULL) {
+		return NULL;
+	}
+	printf("CALLING FIND on : %s \n", path);
+
+	char* pathCopy = (char*) malloc(strlen(path) + 1);
+	strcpy(pathCopy, path);
+	char* token = strtok(pathCopy, "/");
+
+	m_hdr* root = readHeader(fp, 0);
+	m_hdr* current = root;
+
+	while (token != NULL) {
+		printf("token: %s \n", token);
+		if (strcmp(current -> name, token) !=0) {
+			printf("ERROR: %s not equal %s", current-> name, token);
+			return NULL;
+		}
+		token = strtok(NULL, "/");
+		if (token == NULL) {
+			break;
+		}
+
+		if (current -> type == 1) {
+			printf("I am a file \n");
+			printf("FINAL CURRENT: %s \n", current -> name);
+			return current;
+		}
+
+		uint64_t initOffset = current -> offset;
+		printf("Length of current: %d \n", current -> length);
+		for (int i =0; i< current -> length; i++) {
+			printf("i: %d", i);
+			uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
+			uint64_t next_header_block = readOffset(fp, nextOffset);
+			m_hdr* child = readHeader(fp, next_header_block);
+			printf("Child: %s \n", child-> name);
+			if (strcmp(child -> name, token) == 0) {
+				current = child;
+				break;
+			}
+			printf("DID NOT FIND A CHILD \n");
+			return NULL;
+		}
+
+	}
+
+	printf("FINAL CURRENT: %s \n", current -> name);
+
+	return current;
 
 }
 
@@ -126,9 +185,12 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 	(void) fi;
 	int res = 0;
 
+	if(!path) { return -ENOENT; }
+
 	printf("Get attribute called on: %s \n", path);
 	FILE* fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
-	readHeader(fp, 0);
+	//readHeader(fp, 0);
+	//find("/test/ryan.txt", fp);
 
 
 	memset(stbuf, 0, sizeof(struct stat));
@@ -136,14 +198,24 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 		//printf("Get attribute called on: %s", path);
 		stbuf->st_mode = S_IFDIR | 0755;
 		stbuf->st_nlink = 2;
-	} else if (strcmp(path+1, "test") == 0) {
+	}
+
+	m_hdr* head = find(path, fp);
+	if (head == NULL) {
+		return -ENOENT;
+	}
+	if (head -> type == 0) {
+		// dir 
+		stbuf -> st_mode = S_IFDIR | 0444;
+		stbuf -> st_nlink = 1;
+
+	} else if (head -> type == 1) {
 		//printf("Get attribute called on: %s", path);
-		//stbuf->st_mode = S_IFREG | 0444;
-		stbuf->st_mode = S_IFDIR | 0444;
-		stbuf->st_nlink = 1;
-		//stbuf->st_size = strlen(options.contents);
-	} else
+		stbuf->st_mode = S_IFREG | 0444;
+		stbuf->st_size = head -> length;
+	} else {
 		res = -ENOENT;
+	}
 
 	return res;
 }
@@ -157,18 +229,44 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	(void) flags;
 	FILE* fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
 
-	//printf("Hello readdir called on: %s \n", path);
-	if (strcmp(path, "/") != 0)
+	printf("Hello readdir on: %s \n", path);
+
+	m_hdr* dir_header;
+	if (strcmp(path, "/") == 0) {
+		//root
+		printf("Attempting to read the root directory \n");
+		dir_header = readHeader(fp, 0);
+		filler(buf, ".", NULL, 0, 0);
+		filler(buf, "..", NULL, 0, 0);
+		filler(buf, dir_header -> name, NULL, 0, 0);
+		printf("Added %s to the buffer and returned \n", dir_header -> name);
+		return 0;
+	} else {
+		dir_header = find(path, fp);
+	}
+
+	if (dir_header == NULL) {
 		return -ENOENT;
+	}
+
+	if (dir_header -> type != 0) {
+		//not a directory
+		return -ENOENT;
+	}
 
 	filler(buf, ".", NULL, 0, 0);
 	filler(buf, "..", NULL, 0, 0);
 
-	fseek(fp, 0, SEEK_SET);
-
-	char* root_name = (char*) malloc(255);
-	fread((void*)root_name, 1, 255, fp);
-	filler(buf, root_name, NULL, 0, 0);
+	uint64_t initOffset = dir_header -> offset;
+	printf("Length of current: %d \n", dir_header -> length);
+	for (int i =0; i< dir_header -> length; i++) {
+		printf("i: %d", i);
+		uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
+		uint64_t next_header_block = readOffset(fp, nextOffset);
+		m_hdr* child = readHeader(fp, next_header_block);
+		printf("Child: %s \n", child-> name);
+		filler(buf, child->name, NULL, 0, 0);
+	}
 
 	return 0;
 }

@@ -7,7 +7,7 @@ all: generate.out tree.out master.out hello
 rebuild: clean all
 
 clean:
-	rm -f *.o *.out *.wfs
+	rm -f *.o *.out *.wfs hello
 
 ##================================ Executables ===============================##
 
@@ -21,4 +21,4 @@ master.out: Master.cpp
 	g++ $(CFLAGS) Master.cpp -o master.out
 
 hello: hello.c
-	gcc -Wall hello.c `pkg-config fuse3 --cflags --libs` -o hello
+	gcc -Wall -g hello.c `pkg-config fuse3 --cflags --libs` -o hello
