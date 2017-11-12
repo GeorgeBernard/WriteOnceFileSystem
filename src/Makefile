@@ -2,7 +2,7 @@ CFLAGS=  -std=c++11
 
 ##============================== Infrastructure ==============================##
 
-all: generate.out tree.out master.out
+all: generate.out tree.out master.out hello
 
 rebuild: clean all
 
@@ -19,3 +19,6 @@ tree.out: tree.cpp
 
 master.out: Master.cpp
 	g++ $(CFLAGS) Master.cpp -o master.out
+
+hello: hello.c
+	gcc -Wall hello.c `pkg-config fuse3 --cflags --libs` -o hello
