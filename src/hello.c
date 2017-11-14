@@ -129,7 +129,7 @@ static m_hdr* find(const char* path, FILE* fp) {
 	if (path == NULL) {
 		return NULL;
 	}
-	printf("CALLING FIND on : %s \n", path);
+	//printf("CALLING FIND on : %s \n", path);
 
 	char* pathCopy = (char*) malloc(strlen(path) + 1);
 	strcpy(pathCopy, path);
@@ -139,9 +139,9 @@ static m_hdr* find(const char* path, FILE* fp) {
 	m_hdr* current = root;
 
 	while (token != NULL) {
-		printf("token: %s \n", token);
+		//printf("token: %s \n", token);
 		if (strcmp(current -> name, token) !=0) {
-			printf("ERROR: %s not equal %s", current-> name, token);
+			//printf("ERROR: %s not equal %s", current-> name, token);
 			return NULL;
 		}
 		token = strtok(NULL, "/");
@@ -150,30 +150,30 @@ static m_hdr* find(const char* path, FILE* fp) {
 		}
 
 		if (current -> type == 1) {
-			printf("I am a file \n");
-			printf("FINAL CURRENT: %s \n", current -> name);
+			//printf("I am a file \n");
+			//printf("FINAL CURRENT: %s \n", current -> name);
 			return current;
 		}
 
 		uint64_t initOffset = current -> offset;
-		printf("Length of current: %d \n", current -> length);
+		//printf("Length of current: %d \n", current -> length);
 		for (int i =0; i< current -> length; i++) {
-			printf("i: %d", i);
+			//printf("i: %d", i);
 			uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
 			uint64_t next_header_block = readOffset(fp, nextOffset);
 			m_hdr* child = readHeader(fp, next_header_block);
-			printf("Child: %s \n", child-> name);
+			//printf("Child: %s \n", child-> name);
 			if (strcmp(child -> name, token) == 0) {
 				current = child;
 				break;
 			}
-			printf("DID NOT FIND A CHILD \n");
+			//printf("DID NOT FIND A CHILD \n");
 			return NULL;
 		}
 
 	}
 
-	printf("FINAL CURRENT: %s \n", current -> name);
+	//printf("FINAL CURRENT: %s \n", current -> name);
 
 	return current;
 
@@ -187,7 +187,7 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 
 	if(!path) { return -ENOENT; }
 
-	printf("Get attribute called on: %s \n", path);
+	//printf("Get attribute called on: %s \n", path);
 	FILE* fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
 	//readHeader(fp, 0);
 	//find("/test/ryan.txt", fp);
@@ -229,17 +229,17 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	(void) flags;
 	FILE* fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
 
-	printf("Hello readdir on: %s \n", path);
+	//printf("Hello readdir on: %s \n", path);
 
 	m_hdr* dir_header;
 	if (strcmp(path, "/") == 0) {
 		//root
-		printf("Attempting to read the root directory \n");
+		//printf("Attempting to read the root directory \n");
 		dir_header = readHeader(fp, 0);
 		filler(buf, ".", NULL, 0, 0);
 		filler(buf, "..", NULL, 0, 0);
 		filler(buf, dir_header -> name, NULL, 0, 0);
-		printf("Added %s to the buffer and returned \n", dir_header -> name);
+		//printf("Added %s to the buffer and returned \n", dir_header -> name);
 		return 0;
 	} else {
 		dir_header = find(path, fp);
@@ -258,13 +258,13 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	filler(buf, "..", NULL, 0, 0);
 
 	uint64_t initOffset = dir_header -> offset;
-	printf("Length of current: %d \n", dir_header -> length);
+	//printf("Length of current: %d \n", dir_header -> length);
 	for (int i =0; i< dir_header -> length; i++) {
-		printf("i: %d", i);
+		//printf("i: %d \n", i);
 		uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
 		uint64_t next_header_block = readOffset(fp, nextOffset);
 		m_hdr* child = readHeader(fp, next_header_block);
-		printf("Child: %s \n", child-> name);
+		//printf("Child: %s \n", child-> name);
 		filler(buf, child->name, NULL, 0, 0);
 	}
 
@@ -273,8 +273,18 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int hello_open(const char *path, struct fuse_file_info *fi)
 {
-	if (strcmp(path+1, options.filename) != 0)
+	FILE* fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
+	m_hdr* file_header = find(path, fp);
+
+	if (file_header == NULL) {
+		// file not found
 		return -ENOENT;
+	}
+
+	if (file_header -> type != 1) {
+		// not a file
+		return -ENOENT;
+	}
 
 	if ((fi->flags & O_ACCMODE) != O_RDONLY)
 		return -EACCES;
@@ -287,23 +297,44 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 {
 	size_t len;
 	(void) fi;
-	printf("%s path: \n", path);
+	printf("Calling read on %s: \n", path);
 
 	FILE* fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
 	
-	if(strcmp(path+1, options.filename) != 0)
-		return -ENOENT;
+	m_hdr* file_header = find(path, fp);
 
-	len = strlen(options.contents);
-	
+	if (file_header == NULL) {
+		return -ENOENT;
+	}
+
+	if (file_header -> type != 1) {
+		// not a file
+		return -ENOENT;
+	}
+
+	size_t length = file_header -> length;
+	printf("File length: %d \n", length);
+	uint64_t data_block_offset = file_header -> offset;
+	fseek(fp, data_block_offset, SEEK_SET);
+	//char* data_buffer = malloc(len+1);
+	char* data_buffer = malloc(length);
+	int status = fread((void*)data_buffer, 1, length, fp);
+	len = strlen(data_buffer);
+	printf("Data buffer: %s", data_buffer);
+	printf("Length: %d \n", len);
+
+	printf("fread status: %d \n", status);
+
 	
 	if (offset < len) {
 		if (offset + size > len)
 			size = len - offset;
-		memcpy(buf, options.contents + offset, size);
+		memcpy(buf, data_buffer + offset, size);
 	} else
 		size = 0;
 
+	free(data_buffer);
+	printf("Size: %d \n", size);
 	return size;
 }
 
