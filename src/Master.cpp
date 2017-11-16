@@ -71,9 +71,13 @@ int main(int argc, char **argv){
       std::cout << "please enter a directory to parse" << std::endl;
       return 0;
     }
+    if(options.count("key")!=1){
+      std::cout << "please enter a key to use for security" << std::endl;
+      return 0;
+    }
     run(options["path"].as<std::string>(), options["output"].as<std::string>());
   }
-  catch (...) { // shouldn't get to here 
+  catch (...) { // shouldn't get to here
     std::exception_ptr p = std::current_exception();
     std::clog <<(p ? p.__cxa_exception_type()->name() : "null") << std::endl;
     exit(1);
