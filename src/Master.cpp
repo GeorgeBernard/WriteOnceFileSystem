@@ -14,6 +14,7 @@
 
 #include "cxxopts.hpp"
 #include "OnDiskStructure.h"
+#include "sha256.h"
 
 static int s_builder(const char *, const struct stat *, int, struct FTW *);
 int run(std::string, std::string);
@@ -58,6 +59,7 @@ int main(int argc, char **argv){
     options.add_options()
     ("o,output", "Name of output filename", cxxopts::value<std::string>())
     ("p,path", "relative path to directory to master", cxxopts::value<std::string>())
+    ("k,key", "Key for sha256 hashing", cxxopts::value<std::string>())
     ;
     options.parse(argc, argv);
 
