@@ -14,7 +14,7 @@
 
 #include "cxxopts.hpp"
 #include "OnDiskStructure.h"
-#include "sha256.h"
+#include "hmac_sha256.c"
 
 static int s_builder(const char *, const struct stat *, int, struct FTW *);
 int run(std::string, std::string);
@@ -310,6 +310,9 @@ int imageDFS(const std::string& out_filename, node* root) {
 
   writeDFS(root, output);
   fclose(output);
+
+  //Append Hash
+  
 }
 
 uint64_t writeDFS(node* node, FILE* output) {

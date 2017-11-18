@@ -1,6 +1,7 @@
 
 #include <stdio.h>
-#include <string.h>
+#include <string>
+#include <vector>
 #include <openssl/hmac.h>
 
 int main()
@@ -15,7 +16,17 @@ int main()
 
     // Using sha1 hash engine here.
     // You may use other hash engines. e.g EVP_md5(), EVP_sha224, EVP_sha512, etc
-    digest = HMAC(EVP_sha256(), key, strlen(key), (unsigned char*)data, strlen(data), NULL, NULL);
+
+    std::ifstream file("myfile", std::ios::binary | std::ios::ate);
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    std::vector<char> buffer(size);
+    if (file.read(buffer.data(), size)){
+        digest = HMAC(EVP_sha256(), key, strlen(key), string(begin(buffer), end(buffer)).c_str(), strlen(data), NULL, NULL);
+    }
+
+    
 
     // Be careful of the length of string with the choosen hash engine. SHA1 produces a 20-byte hash value which rendered as 40 characters.
     // Change the length accordingly with your choosen hash engine
