@@ -11,16 +11,18 @@
 #include <endian.h>
 #include <stack>
 #include <queue>
+#include <openssl/hmac.h>
 
 #include "cxxopts.hpp"
 #include "OnDiskStructure.h"
-#include "hmac_sha256.c"
+
 
 static int s_builder(const char *, const struct stat *, int, struct FTW *);
-int run(std::string, std::string);
+int run(std::string, std::string, std::string);
 
 int imageDFS(const std::string& out_filename, node* root);
 uint64_t writeDFS(node* node, FILE* output);
+int hashAndAppend(const char*, const char*);
 
 std::string parse_name(const std::string& path_name);
 std::string space_pad(const std::string& s);
@@ -75,7 +77,7 @@ int main(int argc, char **argv){
       std::cout << "please enter a key to use for security" << std::endl;
       return 0;
     }
-    run(options["path"].as<std::string>(), options["output"].as<std::string>());
+    run(options["path"].as<std::string>(), options["output"].as<std::string>(), options["key"].as<std::string>());
   }
   catch (...) { // shouldn't get to here
     std::exception_ptr p = std::current_exception();
@@ -85,7 +87,7 @@ int main(int argc, char **argv){
 
 }
 
-int run(std::string root_directory, std::string wofs_filename){
+int run(std::string root_directory, std::string wofs_filename, std::string key){
 
   //make dummy head node to store ptr to root of the tree
   m_prs h;
@@ -142,7 +144,8 @@ int run(std::string root_directory, std::string wofs_filename){
   << std::endl;
   node* r = &root;
   int imageStatus = imageDFS(wofs_filename, r);
-
+  std::cout << "Appending Sha256 Hash using Key" << "\n";
+  int hashStatus = hashAndAppend(wofs_filename.c_str(), key.c_str());
   return 0;
 }
 
@@ -311,8 +314,37 @@ int imageDFS(const std::string& out_filename, node* root) {
   writeDFS(root, output);
   fclose(output);
 
-  //Append Hash
-  
+}
+
+int hashAndAppend(const char* file_name, const char* key){
+
+  unsigned char* digest;
+
+  // Get File Size
+  struct stat st;
+  stat(file_name, &st);
+  long size = st.st_size;
+
+  //Open up file and read into a buffer
+  FILE* f = fopen(file_name, "a+");
+  unsigned char buffer[size];
+  int bytes_read = fread(buffer, sizeof(char), size, f);
+
+  // Make Hash
+   digest = HMAC(EVP_sha256(), key, strlen(key), buffer, size, NULL, NULL);
+
+
+  //Print the Hash
+  // Be careful of the length of string with the choosen hash engine. SHA1 produces a 20-byte hash value which rendered as 40 characters.
+  // Change the length accordingly with your choosen hash engine
+  char mdString[32];
+  for(int i = 0; i < 32; i++)
+       sprintf(&mdString[i*2], "%02x", (unsigned int)digest[i]);
+
+  // Append the Hash to the file
+  fwrite (digest, sizeof(char), sizeof(mdString), f);
+  fclose (f);
+  return 0;
 }
 
 uint64_t writeDFS(node* node, FILE* output) {
