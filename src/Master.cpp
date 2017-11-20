@@ -332,7 +332,6 @@ int hashAndAppend(const char* file_name, const char* key){
 
   // Make Hash
    digest = HMAC(EVP_sha256(), key, strlen(key), buffer, size, NULL, NULL);
-   free(buffer);
 
   //Print the Hash
   // Be careful of the length of string with the choosen hash engine. SHA1 produces a 20-byte hash value which rendered as 40 characters.
