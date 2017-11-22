@@ -36,6 +36,7 @@ static uint64_t header_off;
 static uint64_t file_off;
 
 const int MAX_METADATA = 1000;
+const int HASH_BLOCK_SIZE = 13107200;
 
 m_prs* meta;
 
@@ -323,26 +324,33 @@ int hashAndAppend(const char* file_name, const char* key){
   // Get File Size
   struct stat st;
   stat(file_name, &st);
-  long size = st.st_size;
-
+  long total_size = st.st_size;
+  int numHashes = total_size / HASH_BLOCK_SIZE;
+  long size = HASH_BLOCK_SIZE;
   //Open up file and read into a buffer
-  FILE* f = fopen(file_name, "a+");
-  unsigned char buffer[size];
-  int bytes_read = fread(buffer, sizeof(char), size, f);
+  for(int i = 0; i < numHashes; i++){
+    if(i+1 == numHashes){
+      size = size % HASH_BLOCK_SIZE;
+    }
+    FILE* f = fopen(file_name, "a+");
+    unsigned char buffer[size];
+    int bytes_read = fread(buffer, sizeof(char), size, f);
 
-  // Make Hash
-   digest = HMAC(EVP_sha256(), key, strlen(key), buffer, size, NULL, NULL);
+    // Make Hash
+     digest = HMAC(EVP_sha256(), key, strlen(key), buffer, size, NULL, NULL);
 
-  //Print the Hash
-  // Be careful of the length of string with the choosen hash engine. SHA1 produces a 20-byte hash value which rendered as 40 characters.
-  // Change the length accordingly with your choosen hash engine
-  char mdString[32];
-  for(int i = 0; i < 32; i++)
-       sprintf(&mdString[i], "%02x", (unsigned int)digest[i]);
+    //Print the Hash
+    // Be careful of the length of string with the choosen hash engine. SHA1 produces a 20-byte hash value which rendered as 40 characters.
+    // Change the length accordingly with your choosen hash engine
+    char mdString[32];
+    for(int i = 0; i < 32; i++)
+         sprintf(&mdString[i], "%02x", (unsigned int)digest[i]);
 
-  // Append the Hash to the file
-  fwrite (digest, sizeof(char), sizeof(mdString), f);
-  fclose (f);
+    // Append the Hash to the file
+    fwrite (digest, sizeof(char), sizeof(mdString), f);
+    fclose (f);
+  }
+
   return 0;
 }
 
