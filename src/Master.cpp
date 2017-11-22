@@ -112,7 +112,7 @@ int main(int argc, char **argv){
 }
 
 // function called on each sub directory/file, updates the global information
-    static int s_builder(const char * path_name, const struct stat * object_info, int ftw, struct FTW * data){
+static int s_builder(const char * path_name, const struct stat * object_info, int ftw, struct FTW * data){
 
     // Parse name to only the final 
     const auto name = parse_name(path_name);
@@ -171,6 +171,9 @@ int main(int argc, char **argv){
 
             //write child information
             parent.children[parent.fill].data = h;
+            if (h == nullptr) {
+                printf("H IS NULL!");
+            }
             parent.children[parent.fill].fill = 0;
             parent.children[parent.fill].children = new node[h->length];
 
@@ -211,6 +214,12 @@ int main(int argc, char **argv){
 		h->time = object_info->st_mtime; // time of last modification, could also use atime for last access or ctime for last status change
 		h->p = fopen(path_name, "r"); // open the file for reading, when writing to img use this stream
 		
+        while(h->p == nullptr){
+            printf("file open is NULL!");
+            printf("try again");
+            h->p = fopen(path_name, "r");
+        }
+
         // add to the tree
         if(!directories.empty()){
             // get parent node
@@ -279,6 +288,8 @@ int imageDFS(const std::string& out_filename, node* root) {
 
 uint64_t writeDFS(node* node, FILE* output) {
 
+    printf("Write DFS called on %s\n", node->data->name);
+
     uint64_t currentOffset = header_off;
 
     fseek(output, currentOffset, SEEK_SET);
@@ -298,10 +309,13 @@ uint64_t writeDFS(node* node, FILE* output) {
         fseek(output, file_off, SEEK_SET); // start at header
 
         uint64_t fileSize = node->data->length;
-        char file_buffer[fileSize];
+        char* file_buffer = new char[fileSize];
         size_t bytes;
 
-        while (0 < (bytes = fread(file_buffer, 1, sizeof(file_buffer), (FILE*) node -> data -> p))){
+        // bytes = fread(file_buffer, 1, 1, (FILE*) node -> data -> p);
+        // printf("Value %s", file_buffer);
+
+       while (0 < (bytes = fread(file_buffer, 1, sizeof(file_buffer), (FILE*) node -> data -> p))){
             fwrite(file_buffer, 1, bytes, output);
         }
 

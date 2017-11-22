@@ -65,6 +65,7 @@ static const struct fuse_opt option_spec[] = {
 };
 
 char* image; 
+FILE* fp;
 
 static void *hello_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
@@ -74,7 +75,7 @@ static void *hello_init(struct fuse_conn_info *conn,
 	return NULL;
 }
 
-static m_hdr* readHeader(FILE* fp, uint64_t curr_offset) {
+static m_hdr* readHeader(uint64_t curr_offset) {
 
 	fseek(fp, curr_offset, SEEK_SET);
 
@@ -119,14 +120,14 @@ static m_hdr* readHeader(FILE* fp, uint64_t curr_offset) {
 	return header;
 }
 
-static uint64_t readOffset(FILE* fp, uint64_t offset) {
+static uint64_t readOffset(uint64_t offset) {
 	fseek(fp, (long) offset, SEEK_SET);
 	uint64_t o;
 	fread((void*)&o, 8, 1, fp);
 	return htobe64(o);	
 }
 
-static m_hdr* find(const char* path, FILE* fp) {
+static m_hdr* find(const char* path) {
 	if (path == NULL) {
 		return NULL;
 	}
@@ -141,7 +142,7 @@ static m_hdr* find(const char* path, FILE* fp) {
 	strcpy(pathCopy, path);
 	char* token = strtok(pathCopy, "/");
 
-	m_hdr* root = readHeader(fp, 0);
+	m_hdr* root = readHeader(0);
 	m_hdr* current = root;
 
 	while (token != NULL) {
@@ -171,8 +172,8 @@ static m_hdr* find(const char* path, FILE* fp) {
 			if (print)
 				printf("i: %d", i);
 			uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
-			uint64_t next_header_block = readOffset(fp, nextOffset);
-			m_hdr* child = readHeader(fp, next_header_block);
+			uint64_t next_header_block = readOffset(nextOffset);
+			m_hdr* child = readHeader(next_header_block);
 			if (print)
 				printf("Child: %s \n", child-> name);
 			if (strcmp(child -> name, token) == 0) {
@@ -206,7 +207,6 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 	if (strcmp(path, "/test/lev1") == 0) {
 		printf("Get attribute called on: %s \n", path);
 	}
-	FILE* fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
 	//readHeader(fp, 0);
 	//find("/test/ryan.txt", fp);
 
@@ -218,7 +218,7 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 		stbuf->st_nlink = 2;
 	}
 
-	m_hdr* head = find(path, fp);
+	m_hdr* head = find(path);
 	if (head == NULL) {
 		return -ENOENT;
 	}
@@ -247,7 +247,6 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	(void) offset;
 	(void) fi;
 	(void) flags;
-	FILE* fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
 
 	//printf("Hello readdir on: %s \n", path);
 
@@ -255,14 +254,14 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	if (strcmp(path, "/") == 0) {
 		//root
 		//printf("Attempting to read the root directory \n");
-		dir_header = readHeader(fp, 0);
+		dir_header = readHeader(0);
 		filler(buf, ".", NULL, 0, 0);
 		filler(buf, "..", NULL, 0, 0);
 		filler(buf, dir_header -> name, NULL, 0, 0);
 		//printf("Added %s to the buffer and returned \n", dir_header -> name);
 		return 0;
 	} else {
-		dir_header = find(path, fp);
+		dir_header = find(path);
 	}
 
 	if (dir_header == NULL) {
@@ -282,8 +281,8 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	for (int i =0; i< dir_header -> length; i++) {
 		//printf("i: %d \n", i);
 		uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
-		uint64_t next_header_block = readOffset(fp, nextOffset);
-		m_hdr* child = readHeader(fp, next_header_block);
+		uint64_t next_header_block = readOffset(nextOffset);
+		m_hdr* child = readHeader(next_header_block);
 		//printf("Child: %s \n", child-> name);
 		filler(buf, child->name, NULL, 0, 0);
 	}
@@ -293,8 +292,7 @@ static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int hello_open(const char *path, struct fuse_file_info *fi)
 {
-	FILE* fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
-	m_hdr* file_header = find(path, fp);
+	m_hdr* file_header = find(path);
 
 	if (file_header == NULL) {
 		// file not found
@@ -318,10 +316,8 @@ static int hello_read(const char *path, char *buf, size_t size, off_t offset,
 	size_t len;
 	(void) fi;
 	printf("Calling read on %s: \n", path);
-
-	FILE* fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
 	
-	m_hdr* file_header = find(path, fp);
+	m_hdr* file_header = find(path);
 
 	if (file_header == NULL) {
 		return -ENOENT;
@@ -390,6 +386,8 @@ int main(int argc, char *argv[])
 	argsFuse[1] = argv[1];
 	argsFuse[2] = argv[2];
 	struct fuse_args args = FUSE_ARGS_INIT(argc-1, argsFuse);
+
+	fp = fopen("/home/george/WriteOnceFileSystem/src/test.wofs", "r");
 
 	/* Set defaults -- we have to use strdup so that
 	   fuse_opt_parse can free the defaults if other
