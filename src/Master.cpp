@@ -11,23 +11,32 @@
 #include <endian.h>
 #include <stack>
 #include <queue>
+#include <openssl/hmac.h>
 
+#include "cxxopts.hpp"
 #include "OnDiskStructure.h"
 
+
 static int s_builder(const char *, const struct stat *, int, struct FTW *);
+int run(std::string, std::string, std::string);
 
 int imageDFS(const std::string& out_filename, node* root);
 uint64_t writeDFS(node* node, FILE* output);
+int hashAndAppend(const char*, const char*);
 
 std::string parse_name(const std::string& path_name);
 std::string space_pad(const std::string& s);
 
 uint64_t find_header_size();
 
+void write64(uint64_t, FILE*);
+void write32(uint32_t, FILE*);
+
 static uint64_t header_off;
 static uint64_t file_off;
 
 const int MAX_METADATA = 1000;
+const int HASH_BLOCK_SIZE = 13107200;
 
 m_prs* meta;
 
@@ -38,77 +47,107 @@ std::stack<node> directories;
 
 int main(int argc, char **argv){
 
-	// ensure input is appropriate
-    if(argc != 3){
-        if(argc < 2){
-        	std::cout << "First argument must be a directory to master." << '\n';
-        }
-        if(argc < 3){
-        	std::cout << "Second argument must be an output filename" << '\n';
-        }
-        return EXIT_FAILURE;
+  // PREVIOUS FUNCTIONAL CODE: ensure input is appropriate
+  // if(argc != 3){
+  //     if(argc < 2){
+  //     	std::cout << "First argument must be a directory to master." << '\n';
+  //     }
+  //     if(argc < 3){
+  //     	std::cout << "Second argument must be an output filename" << '\n';
+  //     }
+  //     return EXIT_FAILURE;
+  // }
+  try{
+    cxxopts::Options options("Master", "Takes in a directory and outputs an imaged File System");
+    options.add_options()
+    ("o,output", "Name of output filename", cxxopts::value<std::string>())
+    ("p,path", "relative path to directory to master", cxxopts::value<std::string>())
+    ("k,key", "Key for sha256 hashing", cxxopts::value<std::string>())
+    ;
+    options.parse(argc, argv);
+
+    if(options.count("output")!=1){
+      std::cout << "please enter an output file name" << std::endl;
+      return 0;
     }
 
-    const std::string root_directory = argv[1];
-    const std::string wofs_filename  = argv[2];
-
-    //make dummy head node to store ptr to root of the tree
-    m_prs h;
-    h.type = DIRECTORY;
-    h.length = 1;
-
-    // make dummy head to store first root
-    node head;
-    head.data = &h;
-    head.fill = 0;
-    head.children = new node[1];
-
-    directories.push(head);
-
-    std::cout << "Traversing filesystem from directory "
-              << '\"' << root_directory << '\"'
-              << std::endl;
-
-    // Using the nftw() funtion to update global structure
-    //	see here: https://www.ibm.com/support/knowledgecenter/en/SSLTBW_2.3.0/com.ibm.zos.v2r3.bpxbd00/rnftw.htm
-            // filepath
-            // function to call on each directory/file
-            // max number of directories that can be used
-
-            // flags to specialize usage, we aren't using any right now
-    int result =  nftw(root_directory.c_str(), s_builder, MAX_METADATA, 0);
-
-    //iterate to real root
-    node root = head.children[0];
-
-    // initialize our array structure
-    meta = (m_prs*) malloc(metadataPointer * sizeof(m_prs));
-    int i = 0;
-
-    // write the tree to an array  this should be put in a separate method later
-    std::queue<node> q;
-    q.push(root);
-    while(!q.empty()){
-        node t = q.front();
-        q.pop();
-        meta[i] = *t.data;
-        i++;
-        // if not a file recurs through sub files/directories
-        if(t.fill != -1){
-            for(int j = 0; j < t.data->length; j++){
-                q.push(t.children[j]);
-            }
-        }
+    if(options.count("path")!=1){
+      std::cout << "please enter a directory to parse" << std::endl;
+      return 0;
     }
 
-    // Now write the file to a structure
-    std::cout << "Writing " << header_count << " files/directories to "
-              << '\"' << wofs_filename << '\"'
-              << std::endl;
-    node* r = &root;
-    int imageStatus = imageDFS(wofs_filename, r);
+    if(options.count("key")!=1){
+      std::cout << "please enter a key to use for security" << std::endl;
+      return 0;
+    }
+    run(options["path"].as<std::string>(), options["output"].as<std::string>(), options["key"].as<std::string>());
+  } catch (...) { // shouldn't get to here
+    std::exception_ptr p = std::current_exception();
+    std::clog <<(p ? p.__cxa_exception_type()->name() : "null") << std::endl;
+    exit(1);
+  }
+}
 
-	return 0;
+int run(std::string root_directory, std::string wofs_filename, std::string key){
+
+  //make dummy head node to store ptr to root of the tree
+  m_prs h;
+  h.type = DIRECTORY;
+  h.length = 1;
+
+  // make dummy head to store first root
+  node head;
+  head.data = &h;
+  head.fill = 0;
+  head.children = new node[1];
+
+  directories.push(head);
+
+  std::cout << "Traversing filesystem from directory "
+  << '\"' << root_directory << '\"'
+  << std::endl;
+
+  // Using the nftw() funtion to update global structure
+  //  see here: https://www.ibm.com/support/knowledgecenter/en/SSLTBW_2.3.0/com.ibm.zos.v2r3.bpxbd00/rnftw.htm
+  // filepath
+  // function to call on each directory/file
+  // max number of directories that can be used
+
+  // flags to specialize usage, we aren't using any right now
+  int result =  nftw(root_directory.c_str(), s_builder, MAX_METADATA, 0);
+
+  //iterate to real root
+  node root = head.children[0];
+
+  // initialize our array structure
+  meta = (m_prs*) malloc(metadataPointer * sizeof(m_prs));
+  int i = 0;
+
+  // write the tree to an array  this should be put in a separate method later
+  std::queue<node> q;
+  q.push(root);
+  while(!q.empty()){
+    node t = q.front();
+    q.pop();
+    meta[i] = *t.data;
+    i++;
+    // if not a file recurs through sub files/directories
+    if(t.fill != -1){
+      for(int j = 0; j < t.data->length; j++){
+        q.push(t.children[j]);
+      }
+    }
+  }
+
+  // Now write the file to a structure
+  std::cout << "Writing " << header_count << " files/directories to "
+  << '\"' << wofs_filename << '\"'
+  << std::endl;
+  node* r = &root;
+  int imageStatus = imageDFS(wofs_filename, r);
+  std::cout << "Appending Sha256 Hash using Key" << "\n";
+  int hashStatus = hashAndAppend(wofs_filename.c_str(), key.c_str());
+  return 0;
 }
 
 // function called on each sub directory/file, updates the global information
@@ -247,68 +286,106 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 }
 
 void write64(uint64_t item, FILE* output) {
-	uint64_t bigEndian = htobe64(item);
-	fwrite((char*) &bigEndian, sizeof(uint64_t), 1, output);
+  uint64_t bigEndian = htobe64(item);
+  fwrite((char*) &bigEndian, sizeof(uint64_t), 1, output);
 }
 
 void write32(uint32_t item, FILE* output) {
-	uint32_t bigEndian = htobe32(item);
-	fwrite((char*) &bigEndian, sizeof(uint32_t), 1, output);
+  uint32_t bigEndian = htobe32(item);
+  fwrite((char*) &bigEndian, sizeof(uint32_t), 1, output);
 }
 
 
 //returns final token separated by /
 std::string parse_name(const std::string& path){
 
-    const auto pos = path.find_last_of("\\/");
-    const bool not_found = pos == std::string::npos;
+  const auto pos = path.find_last_of("\\/");
+  const bool not_found = pos == std::string::npos;
 
-    const auto leaf = not_found ? path : path.substr(pos+1);
+  const auto leaf = not_found ? path : path.substr(pos+1);
 
-    return leaf;
+  return leaf;
 }
 
 std::string space_pad(const std::string& s) {
-    std::string buffer(256, ' ');
-    auto last = std::copy(begin(s), end(s), begin(buffer));
-    *last = '\0';
+  std::string buffer(256, ' ');
+  auto last = std::copy(begin(s), end(s), begin(buffer));
+  *last = '\0';
 
-    return buffer;
+  return buffer;
 }
 
 int imageDFS(const std::string& out_filename, node* root) {
-	header_off = 0;
-	file_off = find_header_size();
+  header_off = 0;
+  file_off = find_header_size();
 
-	FILE *output;
-	output = fopen(out_filename.c_str(), "wb");
+  FILE *output;
+  output = fopen(out_filename.c_str(), "wb");
 
-	writeDFS(root, output);
-	fclose(output);
+  writeDFS(root, output);
+  fclose(output);
+
+}
+
+int hashAndAppend(const char* file_name, const char* key){
+
+  unsigned char* digest;
+  std::cout << "The key is: " << key << std::endl;
+  std::cout << "File name: " << file_name << std::endl;
+  // Get File Size
+  struct stat st;
+  stat(file_name, &st);
+  long total_size = st.st_size;
+  int numHashes = total_size / HASH_BLOCK_SIZE;
+  long size = HASH_BLOCK_SIZE;
+  std::cout << "numHashes: " << numHashes << std::endl;
+  //Open up file and read into a buffer
+  for(int i = 0; i < numHashes; i++){
+    if(i+1 == numHashes){
+      size = size % HASH_BLOCK_SIZE;
+    }
+    FILE* f = fopen(file_name, "a+");
+    unsigned char buffer[size];
+    int bytes_read = fread(buffer, sizeof(char), size, f);
+
+    // Make Hash
+   digest = HMAC(EVP_sha256(), key, strlen(key), buffer, size, NULL, NULL);
+
+    //Print the Hash
+    // Be careful of the length of string with the choosen hash engine. SHA1 produces a 20-byte hash value which rendered as 40 characters.
+    // Change the length accordingly with your choosen hash engine
+    char mdString[32];
+    for(int i = 0; i < 32; i++)
+         sprintf(&mdString[i], "%02x", (unsigned int)digest[i]);
+
+    std::cout << "mdString: " << mdString << std::endl;
+    // Append the Hash to the file
+    fwrite (digest, sizeof(char), sizeof(mdString), f);
+    fclose (f);
+  }
+
+  return 0;
 }
 
 uint64_t writeDFS(node* node, FILE* output) {
 
-    printf("Write DFS called on %s\n", node->data->name);
+  uint64_t currentOffset = header_off;
 
-    uint64_t currentOffset = header_off;
+  fseek(output, currentOffset, SEEK_SET);
 
-    fseek(output, currentOffset, SEEK_SET);
+  std::string padded_name = space_pad(node->data->name);
+  fwrite(padded_name.c_str(), sizeof(char), 256, output);
 
-    std::string padded_name = space_pad(node->data->name);
-    fwrite(padded_name.c_str(), sizeof(char), 256, output);
+  bool is_reg = node -> fill == -1;
+  bool is_dir = node -> fill ==  0;
 
-    bool is_reg = node -> fill == -1;
-    bool is_dir = node -> fill ==  0;
+  if (is_reg) {
+    write64(node->data->length, output);
+    write64(node->data->time, output);
+    write64(file_off, output);
+    write32(node->data->type, output );
 
-    if (is_reg) {
-        write64(node->data->length, output);
-        write64(node->data->time, output);
-        write64(file_off, output);
-        write32(node->data->type, output );
-
-        fseek(output, file_off, SEEK_SET); // start at header
-
+    fseek(output, file_off, SEEK_SET); // start at header
         uint64_t fileSize = node->data->length;
         char* file_buffer = new char[fileSize];
         size_t bytes;
@@ -324,20 +401,19 @@ uint64_t writeDFS(node* node, FILE* output) {
         header_off += M_HDR_SIZE;
         fclose(open_file);
 
-    } else if (is_dir) {
+  } else if (is_dir) {
 
-        write64(node->data->length, output);
-        write64(node->data->time, output);
-        uint64_t endOffset = currentOffset + M_HDR_SIZE;
-        write64(endOffset, output);
-        write32(node->data->type, output );
+    write64(node->data->length, output);
+    write64(node->data->time, output);
+    uint64_t endOffset = currentOffset + M_HDR_SIZE;
+    write64(endOffset, output);
+    write32(node->data->type, output );
 
-        uint64_t numChildren = node->data->length;
-        header_off = endOffset + sizeof(uint64_t) * numChildren;
+    uint64_t numChildren = node->data->length;
+    header_off = endOffset + sizeof(uint64_t) * numChildren;
 
-        for (int i = 0; i<numChildren; i++) {
+    for (int i = 0; i<numChildren; i++) {
             tree_node child = (node -> children)[i];
-
             uint64_t childOffset = writeDFS(&child, output);
             uint64_t desiredSeekLoc = endOffset + i * sizeof(uint64_t);
 
@@ -350,6 +426,6 @@ uint64_t writeDFS(node* node, FILE* output) {
 }
 
 uint64_t find_header_size(){
-    	uint64_t h_size = header_count * M_HDR_SIZE + subitems_count * sizeof(uint64_t);
-		return h_size;
+  uint64_t h_size = header_count * M_HDR_SIZE + subitems_count * sizeof(uint64_t);
+  return h_size;
 }
