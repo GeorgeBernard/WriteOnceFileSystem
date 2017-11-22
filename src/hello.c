@@ -114,6 +114,7 @@ static m_hdr* readHeader(FILE* fp, uint64_t curr_offset) {
 	//printf("headerName: %s \n", header -> name);
 	header-> length = length2;
 	header -> offset = offset2;
+	header -> time = time2;
 	header -> type = type2;
 	return header;
 }
@@ -129,7 +130,12 @@ static m_hdr* find(const char* path, FILE* fp) {
 	if (path == NULL) {
 		return NULL;
 	}
-	//printf("CALLING FIND on : %s \n", path);
+	int print =0;
+	if (strcmp(path, "/test/lev1")==0) {
+		print = 1;
+	}
+	if (print) 
+		printf("CALLING FIND on : %s \n", path);
 
 	char* pathCopy = (char*) malloc(strlen(path) + 1);
 	strcpy(pathCopy, path);
@@ -139,9 +145,11 @@ static m_hdr* find(const char* path, FILE* fp) {
 	m_hdr* current = root;
 
 	while (token != NULL) {
-		//printf("token: %s \n", token);
+		if (print)
+			printf("token: %s \n", token);
 		if (strcmp(current -> name, token) !=0) {
-			//printf("ERROR: %s not equal %s", current-> name, token);
+			if (print)
+				printf("ERROR: %s not equal %s", current-> name, token);
 			return NULL;
 		}
 		token = strtok(NULL, "/");
@@ -156,19 +164,27 @@ static m_hdr* find(const char* path, FILE* fp) {
 		}
 
 		uint64_t initOffset = current -> offset;
-		//printf("Length of current: %d \n", current -> length);
+		if (print)
+			printf("Length of current: %d \n", current -> length);
+		int childFound = 0;
 		for (int i =0; i< current -> length; i++) {
-			//printf("i: %d", i);
+			if (print)
+				printf("i: %d", i);
 			uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
 			uint64_t next_header_block = readOffset(fp, nextOffset);
 			m_hdr* child = readHeader(fp, next_header_block);
-			//printf("Child: %s \n", child-> name);
+			if (print)
+				printf("Child: %s \n", child-> name);
 			if (strcmp(child -> name, token) == 0) {
 				current = child;
+				childFound = 1;
 				break;
 			}
-			//printf("DID NOT FIND A CHILD \n");
-			return NULL;
+		}
+		if (!childFound) {
+			if (print)
+					printf("DID NOT FIND A CHILD \n");
+				return NULL;
 		}
 
 	}
@@ -187,7 +203,9 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 
 	if(!path) { return -ENOENT; }
 
-	//printf("Get attribute called on: %s \n", path);
+	if (strcmp(path, "/test/lev1") == 0) {
+		printf("Get attribute called on: %s \n", path);
+	}
 	FILE* fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
 	//readHeader(fp, 0);
 	//find("/test/ryan.txt", fp);
@@ -213,6 +231,8 @@ static int hello_getattr(const char *path, struct stat *stbuf,
 		//printf("Get attribute called on: %s", path);
 		stbuf->st_mode = S_IFREG | 0444;
 		stbuf->st_size = head -> length;
+		printf("TIME: %d \n", head->time);
+		stbuf->st_mtime = head -> time;
 	} else {
 		res = -ENOENT;
 	}
