@@ -1,0 +1,12 @@
+[global]
+ioengine=libaio
+opendir=${HOME}/WriteOnceFileSystem/tests
+directory=${HOME}/WriteOnceFileSystem/tests/fio-jobs
+blocksize=4k
+size=500m
+
+; -- Don't Write Settings --
+allow_file_create=false
+
+[sequential-read]
+readwrite=read
