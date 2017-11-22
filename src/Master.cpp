@@ -50,7 +50,7 @@ int main(int argc, char **argv){
     }
 
     const std::string root_directory = argv[1];
-    const std::string wofs_filename  = argv[2]; 
+    const std::string wofs_filename  = argv[2];
 
     //make dummy head node to store ptr to root of the tree
     m_prs h;
@@ -65,7 +65,7 @@ int main(int argc, char **argv){
 
     directories.push(head);
 
-    std::cout << "Traversing filesystem from directory " 
+    std::cout << "Traversing filesystem from directory "
               << '\"' << root_directory << '\"'
               << std::endl;
 
@@ -102,9 +102,9 @@ int main(int argc, char **argv){
     }
 
     // Now write the file to a structure
-    std::cout << "Writing " << header_count << " files/directories to " 
-              << '\"' << wofs_filename << '\"' 
-              << std::endl; 
+    std::cout << "Writing " << header_count << " files/directories to "
+              << '\"' << wofs_filename << '\"'
+              << std::endl;
     node* r = &root;
     int imageStatus = imageDFS(wofs_filename, r);
 
@@ -114,10 +114,10 @@ int main(int argc, char **argv){
 // function called on each sub directory/file, updates the global information
 static int s_builder(const char * path_name, const struct stat * object_info, int ftw, struct FTW * data){
 
-    // Parse name to only the final 
+    // Parse name to only the final
     const auto name = parse_name(path_name);
     const char* dir_file_name = name.c_str();
-    
+
     // Ignore if current directory or parent directory
 	if (name == "." || name == "..") {
 		return 0;
@@ -126,7 +126,7 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
     header_count++;
 	// store directory metadata
 	if(ftw == FTW_D){
-        
+
         //get filename
         std::string padded_name = space_pad(dir_file_name);
 		const char* buffer = padded_name.c_str();
@@ -156,14 +156,13 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 		// assign all values
         m_prs* h = new m_prs;
         subitems_count = subitems_count + dir_length;
-        
+
         // Write data to
         strncpy(h->name, buffer, 256);
 		h->type = DIRECTORY;
 		h->length = dir_length;
 		h->time = object_info->st_mtime;
-		h->p = (void*) opendir(path_name);
-
+		h->p = strdup(path_name);
         // insert into parent if there is one
         if(!directories.empty()){
             node parent = directories.top();
@@ -190,7 +189,7 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
             if(parent.children[parent.fill-1].data->length != 0){
                 directories.push(parent.children[parent.fill-1]);
             }
-           
+
         }
 
 		metadataPointer++;
@@ -199,11 +198,11 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 
 	// Store File Metadata - possibly add in FTW_NS and FTW_SNL functionality for failed symbolic links
 	else if((ftw == FTW_F) || (ftw == FTW_SL)){
-		
+
         //Pad filename to 256
         std::string padded_name = space_pad(dir_file_name);
         const char* buffer = padded_name.c_str();
-        
+
 		// assign all values
         m_prs* h = new m_prs;
 
@@ -212,13 +211,15 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
         h->type = PLAIN_FILE;
 		h->length = object_info->st_size;
 		h->time = object_info->st_mtime; // time of last modification, could also use atime for last access or ctime for last status change
-		h->p = fopen(path_name, "r"); // open the file for reading, when writing to img use this stream
-		
-        while(h->p == nullptr){
+    h->p =  strdup(path_name);
+		// open the file for reading, when writing to img use this stream
+		    FILE* test = fopen(h->p, "r");
+        while(test == nullptr){
             printf("file open is NULL!");
             printf("try again");
-            h->p = fopen(path_name, "r");
+            test = fopen(h->p, "r");
         }
+        fclose(test);
 
         // add to the tree
         if(!directories.empty()){
@@ -258,10 +259,10 @@ void write32(uint32_t item, FILE* output) {
 
 //returns final token separated by /
 std::string parse_name(const std::string& path){
-    
+
     const auto pos = path.find_last_of("\\/");
     const bool not_found = pos == std::string::npos;
-    
+
     const auto leaf = not_found ? path : path.substr(pos+1);
 
     return leaf;
@@ -271,7 +272,7 @@ std::string space_pad(const std::string& s) {
     std::string buffer(256, ' ');
     auto last = std::copy(begin(s), end(s), begin(buffer));
     *last = '\0';
-    
+
     return buffer;
 }
 
@@ -314,13 +315,14 @@ uint64_t writeDFS(node* node, FILE* output) {
 
         // bytes = fread(file_buffer, 1, 1, (FILE*) node -> data -> p);
         // printf("Value %s", file_buffer);
-
-       while (0 < (bytes = fread(file_buffer, 1, sizeof(file_buffer), (FILE*) node -> data -> p))){
+        FILE* open_file = fopen((node->data->p), "r");
+       while (0 < (bytes = fread(file_buffer, 1, sizeof(file_buffer), open_file))){
             fwrite(file_buffer, 1, bytes, output);
         }
-
+          std::cout << "not" << "\n";
         file_off += fileSize;
         header_off += M_HDR_SIZE;
+        fclose(open_file);
 
     } else if (is_dir) {
 
@@ -338,12 +340,12 @@ uint64_t writeDFS(node* node, FILE* output) {
 
             uint64_t childOffset = writeDFS(&child, output);
             uint64_t desiredSeekLoc = endOffset + i * sizeof(uint64_t);
-            
-            fseek(output, desiredSeekLoc, SEEK_SET); 
+
+            fseek(output, desiredSeekLoc, SEEK_SET);
             write64(childOffset, output);
         }
     }
-    
+
     return currentOffset;
 }
 

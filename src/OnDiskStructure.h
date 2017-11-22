@@ -11,7 +11,7 @@ struct metadata_parse {
 	enum file_type type;    // indicates file or directory 0 - file 1 - directory
 	uint64_t length; 		// for file the length of the file in bytes, for directory the number of sub files/directories
 	uint64_t time;   		// The time of access in UNIX time - saved as an unsigned long
-	void* p;              	// Pointer to either the start of the file or the subfiles/directories
+	char* p;              	// File/directory name of the location
 						  		// if pointing to a file be sure to cast before using
 };
 typedef struct metadata_parse m_prs;
