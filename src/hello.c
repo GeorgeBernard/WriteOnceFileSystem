@@ -387,7 +387,7 @@ int main(int argc, char *argv[])
 	argsFuse[2] = argv[2];
 	struct fuse_args args = FUSE_ARGS_INIT(argc-1, argsFuse);
 
-	fp = fopen("/home/george/WriteOnceFileSystem/src/test.wofs", "r");
+	fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
 
 	/* Set defaults -- we have to use strdup so that
 	   fuse_opt_parse can free the defaults if other

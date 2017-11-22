@@ -1,8 +1,8 @@
 import os
 import subprocess
 
-VERBOSE_FLAG = False
-ITERATIONS = 100
+VERBOSE_FLAG = True
+ITERATIONS = 1
 
 def match(a, b, msg):
     if (a == b):                            # Print that they match
@@ -13,8 +13,8 @@ def match(a, b, msg):
             print(msg, " Failure")
         exit()
 
-mount_point = "../src/mount_point/test"
-true_path = "../src/test"
+mount_point = "../src/mountPoint/test/tests"
+true_path = "./tests"
 
 find_command = 'find '
 test_out = os.popen(find_command + true_path).read().split('\n')[0:-1]
