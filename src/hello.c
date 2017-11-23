@@ -30,6 +30,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <endian.h>
+ #include <openssl/hmac.h>
 
 
 struct metadata_header {
@@ -373,14 +374,54 @@ static void show_help(const char *progname)
 	       "\n");
 }
 
+int checkHash() {
+	char* file_name = "/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs";
+	struct stat st;
+ 	stat(file_name, &st);
+  	long file_size = st.st_size;
+  	printf("File size %d\n", file_size);
+
+  	int hashSize = 32;
+
+  	long hashStart = file_size - hashSize;
+  	fseek(fp, hashStart, SEEK_SET);
+
+  	char hash[32];
+  	int hashSuccess = fread(hash, hashSize, 1, fp);
+
+  	printf("Successful read %d\n", hashSuccess);
+  	printf("hash: %x\n", hash[0]);
+
+  	
+  	fseek(fp, 0, SEEK_SET);
+  	unsigned char buffer[hashStart];
+  	int bytes_read = fread(buffer, sizeof(char), hashStart, fp);
+
+
+  	// Make Hash
+  	const char* key = "stranger";
+  	unsigned char* digest;
+  	digest = HMAC(EVP_sha256(), key, strlen(key), buffer, hashStart, NULL, NULL);
+
+  	//Print the Hash
+  	// Be careful of the length of string with the choosen hash engine. SHA1 produces a 20-byte hash value which rendered as 40 characters.
+  	// Change the length accordingly with your choosen hash engine
+  	printf("digest[0] %x \n", digest[0]);
+
+  	int r = 1;
+
+  	for (int i =0; i< 32; i++) {
+    	printf("i: %d file: %x hash: %x \n", i, (unsigned char) hash[i], digest[i]);
+    	if ((unsigned char) hash[i] != digest[i]) {
+      	r = 0;
+    	}
+  	}
+  	return r;
+	
+}
+
 int main(int argc, char *argv[])
 {
-	printf("%s \n", argv[3]);
-	size_t length = strlen(argv[3]) + 1;
-	image = malloc(length);
-	memcpy(image, argv[3], length);
-
-	printf("copy: %s \n", image);
 	char** argsFuse = malloc(3 * sizeof(char*));
 	argsFuse[0] = argv[0];
 	argsFuse[1] = argv[1];
@@ -389,6 +430,9 @@ int main(int argc, char *argv[])
 
 	fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
 
+	int hashCorrect = checkHash();
+	printf("Hash correct: %d\n", hashCorrect);
+	exit(0);
 	/* Set defaults -- we have to use strdup so that
 	   fuse_opt_parse can free the defaults if other
 	   values are specified */

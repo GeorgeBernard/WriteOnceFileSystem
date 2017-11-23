@@ -335,34 +335,36 @@ int hashAndAppend(const char* file_name, const char* key){
   // Get File Size
   struct stat st;
   stat(file_name, &st);
-  long total_size = st.st_size;
-  int numHashes = total_size / HASH_BLOCK_SIZE;
-  long size = HASH_BLOCK_SIZE;
-  std::cout << "numHashes: " << numHashes << std::endl;
+  long size = st.st_size;
+  std::cout << "File size: " << size << std::endl;
+
   //Open up file and read into a buffer
-  for(int i = 0; i < numHashes; i++){
-    if(i+1 == numHashes){
-      size = size % HASH_BLOCK_SIZE;
-    }
-    FILE* f = fopen(file_name, "a+");
-    unsigned char buffer[size];
-    int bytes_read = fread(buffer, sizeof(char), size, f);
+  FILE* f = fopen(file_name, "a+");
+  unsigned char buffer[size];
+  int bytes_read = fread(buffer, sizeof(char), size, f);
 
-    // Make Hash
-   digest = HMAC(EVP_sha256(), key, strlen(key), buffer, size, NULL, NULL);
+  // Make Hash
+  digest = HMAC(EVP_sha256(), key, strlen(key), buffer, size, NULL, NULL);
 
-    //Print the Hash
-    // Be careful of the length of string with the choosen hash engine. SHA1 produces a 20-byte hash value which rendered as 40 characters.
-    // Change the length accordingly with your choosen hash engine
-    char mdString[32];
-    for(int i = 0; i < 32; i++)
-         sprintf(&mdString[i], "%02x", (unsigned int)digest[i]);
+  //Print the Hash
+  // Be careful of the length of string with the choosen hash engine. SHA1 produces a 20-byte hash value which rendered as 40 characters.
+  // Change the length accordingly with your choosen hash engine
+  char mdString[32];
+  for(int i = 0; i < 32; i++)
+      sprintf(&mdString[i], "%02x", (unsigned int)digest[i]);
 
-    std::cout << "mdString: " << mdString << std::endl;
-    // Append the Hash to the file
-    fwrite (digest, sizeof(char), sizeof(mdString), f);
-    fclose (f);
-  }
+  std::cout << "mdString: " << mdString << std::endl;
+
+  printf("hash: %c\n", (unsigned char) mdString[0]);
+  printf("hash: %c\n", (unsigned char) mdString[1]);
+  
+  // Append the Hash to the file
+
+  //fwrite (digest, sizeof(char), sizeof(mdString), f);
+  std::cout << "digest[0]: " << digest[0] << std::endl;
+  printf("digest[0] %x \n", digest[0]);
+  fwrite (digest, sizeof(char), 32, f);
+  fclose (f);
 
   return 0;
 }
