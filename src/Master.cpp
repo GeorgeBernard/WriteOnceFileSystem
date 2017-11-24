@@ -446,12 +446,13 @@ uint64_t writeDFS(node* node, FILE* output) {
         // bytes = fread(file_buffer, 1, 1, (FILE*) node -> data -> p);
         // printf("Value %s", file_buffer);
         FILE* open_file = fopen((node->data->p), "r");
-       while (0 < (bytes = fread(file_buffer, 1, sizeof(file_buffer), open_file))){
+        while (0 < (bytes = fread(file_buffer, 1, sizeof(file_buffer), open_file))){
             fwrite(file_buffer, 1, bytes, output);
         }
         file_off += fileSize;
         header_off += M_HDR_SIZE;
         fclose(open_file);
+        free(file_buffer);
 
   } else if (is_dir) {
 

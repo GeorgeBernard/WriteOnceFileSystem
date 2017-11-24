@@ -336,6 +336,7 @@ static struct options {
 	const char *filename;
 	const char *key;
 	int show_help;
+	int no_ecc;
 } options;
 
 #define OPTION(t, p)                           \
@@ -345,6 +346,7 @@ static const struct fuse_opt option_spec[] = {
 	OPTION("--key=%s", key),
 	OPTION("-h", show_help),
 	OPTION("--help", show_help),
+	OPTION("--necc", no_ecc),
 	FUSE_OPT_END
 };
 
@@ -389,7 +391,7 @@ int main(int argc, char *argv[])
 	const char* file_name;
 	if (options.filename == NULL) {
 		// TODO: after developement, don't make this default
-		file_name = "/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs";
+		file_name = "/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs.necc";
 	} else {
 		file_name = options.filename;
 	}
@@ -400,10 +402,15 @@ int main(int argc, char *argv[])
 		exit_program();
 	}
 
-	std::string infile = "/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs";
-	std::string outfile = infile + ".necc2";
+	std::string outfile;
+	if (options.no_ecc) {
+		outfile = file_name;
+	} else {
+		std::string infile = file_name;
+		std::string outfile = infile + ".necc2";
+  		int decodeResults = decode(infile, outfile);
+	}
 
-  	int decodeResults = decode(infile, outfile);
   	fp = fopen(outfile.c_str(), "r");
 	int hash_correct = checkHash(outfile.c_str(), options.key);
 
