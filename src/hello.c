@@ -30,8 +30,10 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <endian.h>
- #include <openssl/hmac.h>
+#include <openssl/hmac.h>
 
+static long HASH_BLOCK_SIZE = 1000;
+FILE* fp;
 
 struct metadata_header {
     char name[256];
@@ -41,32 +43,6 @@ struct metadata_header {
     uint32_t type;
 };
 typedef struct metadata_header m_hdr;
-
-/*
- * Command line options
- *
- * We can't set default values for the char* fields here because
- * fuse_opt_parse would attempt to free() them when the user specifies
- * different values on the command line.
- */
-static struct options {
-	const char *filename;
-	const char *contents;
-	int show_help;
-} options;
-
-#define OPTION(t, p)                           \
-    { t, offsetof(struct options, p), 1 }
-static const struct fuse_opt option_spec[] = {
-	OPTION("--name=%s", filename),
-	OPTION("--contents=%s", contents),
-	OPTION("-h", show_help),
-	OPTION("--help", show_help),
-	FUSE_OPT_END
-};
-
-char* image; 
-FILE* fp;
 
 static void *hello_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
@@ -132,12 +108,6 @@ static m_hdr* find(const char* path) {
 	if (path == NULL) {
 		return NULL;
 	}
-	int print =0;
-	if (strcmp(path, "/test/lev1")==0) {
-		print = 1;
-	}
-	if (print) 
-		printf("CALLING FIND on : %s \n", path);
 
 	char* pathCopy = (char*) malloc(strlen(path) + 1);
 	strcpy(pathCopy, path);
@@ -147,54 +117,39 @@ static m_hdr* find(const char* path) {
 	m_hdr* current = root;
 
 	while (token != NULL) {
-		if (print)
-			printf("token: %s \n", token);
 		if (strcmp(current -> name, token) !=0) {
-			if (print)
-				printf("ERROR: %s not equal %s", current-> name, token);
 			return NULL;
 		}
 		token = strtok(NULL, "/");
+
 		if (token == NULL) {
 			break;
 		}
 
 		if (current -> type == 1) {
-			//printf("I am a file \n");
-			//printf("FINAL CURRENT: %s \n", current -> name);
 			return current;
 		}
 
 		uint64_t initOffset = current -> offset;
-		if (print)
-			printf("Length of current: %d \n", current -> length);
 		int childFound = 0;
+
 		for (int i =0; i< current -> length; i++) {
-			if (print)
-				printf("i: %d", i);
 			uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
 			uint64_t next_header_block = readOffset(nextOffset);
 			m_hdr* child = readHeader(next_header_block);
-			if (print)
-				printf("Child: %s \n", child-> name);
+
 			if (strcmp(child -> name, token) == 0) {
 				current = child;
 				childFound = 1;
 				break;
 			}
 		}
+
 		if (!childFound) {
-			if (print)
-					printf("DID NOT FIND A CHILD \n");
-				return NULL;
+			return NULL;
 		}
-
 	}
-
-	//printf("FINAL CURRENT: %s \n", current -> name);
-
 	return current;
-
 }
 
 static int hello_getattr(const char *path, struct stat *stbuf,
@@ -374,51 +329,99 @@ static void show_help(const char *progname)
 	       "\n");
 }
 
-int checkHash() {
-	char* file_name = "/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs";
+uint32_t read32(FILE* fp, uint64_t offset) {
+    fseek(fp, offset, SEEK_SET);
+    uint32_t data;
+    fread((void*)&data, sizeof(uint32_t), 1, fp);
+    return htobe32(data);
+}
+
+int checkHash(const char* file_name, const char* key) {
+	
 	struct stat st;
  	stat(file_name, &st);
   	long file_size = st.st_size;
-  	printf("File size %d\n", file_size);
 
-  	int hashSize = 32;
+  	int hash_size = 32; //size of each hash
 
-  	long hashStart = file_size - hashSize;
-  	fseek(fp, hashStart, SEEK_SET);
+  	// Determine the number of hashes that was generated during mastering
+  	uint64_t number_hash_location = file_size - sizeof(uint32_t);
+	uint32_t number_hashes = read32(fp, number_hash_location);
+	uint64_t hashes_offset = number_hash_location - hash_size * number_hashes;
+	uint64_t image_size = hashes_offset;
+	uint64_t remaining = image_size;
 
-  	char hash[32];
-  	int hashSuccess = fread(hash, hashSize, 1, fp);
+	if (HASH_BLOCK_SIZE > image_size) {
+		HASH_BLOCK_SIZE = image_size;
+	}
 
-  	printf("Successful read %d\n", hashSuccess);
-  	printf("hash: %x\n", hash[0]);
+	int block_size = HASH_BLOCK_SIZE;
+	int hash_count = 0; // running tally of number of hashes checked
 
-  	
-  	fseek(fp, 0, SEEK_SET);
-  	unsigned char buffer[hashStart];
-  	int bytes_read = fread(buffer, sizeof(char), hashStart, fp);
+	// malloc the buffer because it could be large
+	unsigned char* buffer = (unsigned char*) malloc(block_size * sizeof(char));
+	if (buffer == NULL) {
+		printf("Call to allocate buffer failed\n");
+		exit(0);
+	}
 
+	while (remaining > 0) {
 
-  	// Make Hash
-  	const char* key = "strange";
-  	unsigned char* digest;
-  	digest = HMAC(EVP_sha256(), key, strlen(key), buffer, hashStart, NULL, NULL);
+		// read the hash saved in the mastered image
+	  	fseek(fp, hashes_offset, SEEK_SET);
+	  	char mastered_hash[hash_size];
+	  	fread(mastered_hash, hash_size, 1, fp);
+	  	
+	  	// generate the hash based on the data in the master image
+	  	int data_block_local = hash_count * HASH_BLOCK_SIZE;
+	  	fseek(fp, data_block_local, SEEK_SET);
+	  	int bytes_read = fread(buffer, sizeof(char), block_size, fp);
+	  	unsigned char* digest;
+	  	digest = HMAC(EVP_sha256(), key, strlen(key), buffer, block_size, NULL, NULL);
 
-  	//Print the Hash
-  	// Be careful of the length of string with the choosen hash engine. SHA1 produces a 20-byte hash value which rendered as 40 characters.
-  	// Change the length accordingly with your choosen hash engine
-  	printf("digest[0] %x \n", digest[0]);
+	  	// compare the two hashes
+	  	for (int i =0; i< hash_size; i++) {
+	    	if ((unsigned char) mastered_hash[i] != digest[i]) {
+	    		free(buffer);
+	      		return 0;
+	    	}
+	  	}
 
-  	int r = 1;
-
-  	for (int i =0; i< 32; i++) {
-    	// printf("i: %d file: %x hash: %x \n", i, (unsigned char) hash[i], digest[i]);
-    	if ((unsigned char) hash[i] != digest[i]) {
-      	r = 0;
-    	}
+	  	hash_count = hash_count + 1;
+	  	remaining = remaining - block_size;
+	  	if (block_size > remaining) {
+	  		block_size = remaining;
+	  	}
+	  	hashes_offset = hashes_offset + hash_size;
   	}
-  	return r;
-	
+  	free(buffer);
+  	return 1;
 }
+
+
+/*
+ * Command line options
+ *
+ * We can't set default values for the char* fields here because
+ * fuse_opt_parse would attempt to free() them when the user specifies
+ * different values on the command line.
+ */
+static struct options {
+	const char *filename;
+	const char *contents;
+	int show_help;
+} options;
+
+#define OPTION(t, p)                           \
+    { t, offsetof(struct options, p), 1 }
+static const struct fuse_opt option_spec[] = {
+	OPTION("--name=%s", filename),
+	OPTION("--contents=%s", contents),
+	OPTION("-h", show_help),
+	OPTION("--help", show_help),
+	FUSE_OPT_END
+};
+
 
 int main(int argc, char *argv[])
 {
@@ -426,31 +429,18 @@ int main(int argc, char *argv[])
 	argsFuse[0] = argv[0];
 	argsFuse[1] = argv[1];
 	argsFuse[2] = argv[2];
-	
-	fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
 
-	int hashCorrect = checkHash();
-	if (!hashCorrect) {
-		printf("Data integrity issue detected.\n");
-		printf("Please verify the key you are using is correct.\n");
-		printf("Please correct issue offline and remount.\n");
-		exit(0);
-	} else {
-		printf("Hash correct: %d\n", hashCorrect);
-	}
-	struct fuse_args args = FUSE_ARGS_INIT(argc, argsFuse);
-	
-	/* Set defaults -- we have to use strdup so that
-	   fuse_opt_parse can free the defaults if other
-	   values are specified */
-	//options.filename = strdup("hello");
-	options.filename = strdup("test");
-	options.contents = strdup("Hello World!\n");
+	// TODO: make argument
+	const char* file_name = "/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs";
+	fp = fopen(file_name, "r");
+
+	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
 	/* Parse options */
 	if (fuse_opt_parse(&args, &options, option_spec, NULL) == -1)
 		return 1;
 
+	printf("name: %s", options.filename);
 	/* When --help is specified, first print our own file-system
 	   specific help text, then signal fuse_main to show
 	   additional help (by adding `--help` to the options again)
@@ -460,6 +450,20 @@ int main(int argc, char *argv[])
 		show_help(argv[0]);
 		assert(fuse_opt_add_arg(&args, "--help") == 0);
 		args.argv[0] = (char*) "";
+	}
+
+	exit(0);
+
+	int hash_correct = checkHash(file_name, argv[3]);
+
+	if (!hash_correct) {
+		printf("Data integrity issue detected.\n");
+		printf("Please verify the key you are using is correct.\n");
+		printf("Please correct issue offline and remount.\n");
+		free(argsFuse);
+		exit(0);
+	} else {
+		printf("Hash correct: %d\n", hash_correct);
 	}
 
 	return fuse_main(args.argc, args.argv, &hello_oper, NULL);

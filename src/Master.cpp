@@ -16,7 +16,6 @@
 #include "cxxopts.hpp"
 #include "OnDiskStructure.h"
 
-
 static int s_builder(const char *, const struct stat *, int, struct FTW *);
 int run(std::string, std::string, std::string);
 
@@ -36,7 +35,7 @@ static uint64_t header_off;
 static uint64_t file_off;
 
 const int MAX_METADATA = 1000;
-const int HASH_BLOCK_SIZE = 13107200;
+static int HASH_BLOCK_SIZE = 1024;
 
 m_prs* meta;
 
@@ -329,47 +328,46 @@ int imageDFS(const std::string& out_filename, node* root) {
 
 int hashAndAppend(const char* file_name, const char* key){
 
-  unsigned char* digest;
-  std::cout << "The key is: " << key << std::endl;
-  std::cout << "File name: " << file_name << std::endl;
-  // Get File Size
+  FILE* fp = fopen(file_name, "a+");
+
+  // get the file size
   struct stat st;
   stat(file_name, &st);
-  long size = st.st_size;
-  std::cout << "File size: " << size << std::endl;
-  long remaining_unhashed = size;
-  hash_size = 100;
-  FILE* f = fopen(file_name, "a+");
+  long file_size = st.st_size;
+ 
+  if (HASH_BLOCK_SIZE > file_size) {
+    HASH_BLOCK_SIZE = file_size;
+  } 
+  int block_size = HASH_BLOCK_SIZE;
+  long remaining = file_size;
+  uint32_t number_hashes = 0;
+  // malloc a buffer for the data- may be large
+  unsigned char* buffer = (unsigned char*) malloc(block_size * sizeof(char));
+  int hash_size = 32; 
 
-  while (remaining_unhashed > 0) {
-    //Open up file and read into a buffer
-    //TODO: malloc and check
-    unsigned char buffer[hash_size];
-    int bytes_read = fread(buffer, sizeof(char), hash_size, f);
+  while (remaining > 0) {
+    number_hashes = number_hashes + 1;
+    int data_location = (number_hashes-1) * HASH_BLOCK_SIZE;
+    fseek(fp, data_location, SEEK_SET);
+    int bytes_read = fread(buffer, sizeof(char), block_size, fp);
 
-    // Make Hash
-    digest = HMAC(EVP_sha256(), key, strlen(key), buffer, size, NULL, NULL);
+    // make the hash Hash
+    unsigned char* digest;
+    digest = HMAC(EVP_sha256(), key, strlen(key), buffer, block_size, NULL, NULL);
 
-    //Print the Hash
-    // Be careful of the length of string with the choosen hash engine. SHA1 produces a 20-byte hash value which rendered as 40 characters.
-    // Change the length accordingly with your choosen hash engine
-    char mdString[32];
-    for(int i = 0; i < 32; i++)
-        sprintf(&mdString[i], "%02x", (unsigned int)digest[i]);
-
-    std::cout << "mdString: " << mdString << std::endl;
-
-    printf("hash: %c\n", (unsigned char) mdString[0]);
-    printf("hash: %c\n", (unsigned char) mdString[1]);
-    
     // Append the Hash to the file
+    fwrite (digest, sizeof(char), hash_size, fp);
 
-    //fwrite (digest, sizeof(char), sizeof(mdString), f);
-    std::cout << "digest[0]: " << digest[0] << std::endl;
-    printf("digest[0] %x \n", digest[0]);
-    fwrite (digest, sizeof(char), 32, f);
-    fclose (f);
+    remaining = remaining - block_size;
+    if (block_size > remaining) {
+      block_size = remaining;
+    }
+
   }
+
+  // Write the number of hashes generated and close the file
+  write32(number_hashes, fp);
+  fclose (fp);
 
   return 0;
 }
