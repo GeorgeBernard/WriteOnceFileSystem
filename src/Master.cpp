@@ -437,23 +437,29 @@ uint64_t writeDFS(node* node, FILE* output) {
     write64(node->data->time, output);
     write64(file_off, output);
     write32(node->data->type, output );
-
     fseek(output, file_off, SEEK_SET); // start at header
-        uint64_t fileSize = node->data->length;
-        char* file_buffer = new char[fileSize];
-        size_t bytes;
-
-        // bytes = fread(file_buffer, 1, 1, (FILE*) node -> data -> p);
-        // printf("Value %s", file_buffer);
-        FILE* open_file = fopen((node->data->p), "r");
-        while (0 < (bytes = fread(file_buffer, 1, sizeof(file_buffer), open_file))){
-            fwrite(file_buffer, 1, bytes, output);
-        }
-        file_off += fileSize;
-        header_off += M_HDR_SIZE;
-        fclose(open_file);
-        free(file_buffer);
-
+    uint64_t fileSize = node->data->length;
+    int blockSize = 1024;
+    int remaining = fileSize;
+    if (blockSize > fileSize) {
+      blockSize = fileSize;
+    }
+    std::cout << "Attempting to write" <<std::endl;
+    FILE* open_file = fopen((node->data->p), "r");
+    char* file_buffer[blockSize];
+    while (remaining > 0) {
+      size_t bytes;
+      while (0 < (bytes = fread(file_buffer, 1, sizeof(file_buffer), open_file))){
+          fwrite(file_buffer, 1, bytes, output);
+      }
+      remaining = remaining - blockSize;
+      if (blockSize > remaining) {
+        blockSize = remaining;
+      }
+    }
+    file_off += fileSize;
+    header_off += M_HDR_SIZE;
+    fclose(open_file);
   } else if (is_dir) {
 
     write64(node->data->length, output);
