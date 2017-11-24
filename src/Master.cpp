@@ -12,9 +12,14 @@
 #include <stack>
 #include <queue>
 #include <openssl/hmac.h>
+#include <cstddef>
 
 #include "cxxopts.hpp"
 #include "OnDiskStructure.h"
+#include "schifra/schifra_galois_field.hpp"
+#include "schifra/schifra_sequential_root_generator_polynomial_creator.hpp"
+#include "schifra/schifra_reed_solomon_encoder.hpp"
+#include "schifra/schifra_reed_solomon_file_encoder.hpp"
 
 static int s_builder(const char *, const struct stat *, int, struct FTW *);
 int run(std::string, std::string, std::string);
@@ -22,6 +27,7 @@ int run(std::string, std::string, std::string);
 int imageDFS(const std::string& out_filename, node* root);
 uint64_t writeDFS(node* node, FILE* output);
 int hashAndAppend(const char*, const char*);
+int addReedSolomon(std::string ifs, std::string ofs);
 
 std::string parse_name(const std::string& path_name);
 std::string space_pad(const std::string& s);
@@ -138,12 +144,15 @@ int run(std::string root_directory, std::string wofs_filename, std::string key){
     }
   }
 
+  std::string pre_filename = wofs_filename + ".necc";
   // Now write the file to a structure
   std::cout << "Writing " << header_count << " files/directories to "
-  << '\"' << wofs_filename << '\"'
+  << '\"' << pre_filename << '\"'
   << std::endl;
   node* r = &root;
-  int imageStatus = imageDFS(wofs_filename, r);
+  int imageStatus = imageDFS(pre_filename, r);
+  std::cout << "Converting to Reed Solomon Error Correcting Blocks, outputing to: " << wofs_filename << "\n";
+  int reedSolomonStatus = addReedSolomon(pre_filename,wofs_filename);
   std::cout << "Appending Sha256 Hash using Key" << "\n";
   int hashStatus = hashAndAppend(wofs_filename.c_str(), key.c_str());
   return 0;
@@ -334,16 +343,16 @@ int hashAndAppend(const char* file_name, const char* key){
   struct stat st;
   stat(file_name, &st);
   long file_size = st.st_size;
- 
+
   if (HASH_BLOCK_SIZE > file_size) {
     HASH_BLOCK_SIZE = file_size;
-  } 
+  }
   int block_size = HASH_BLOCK_SIZE;
   long remaining = file_size;
   uint32_t number_hashes = 0;
   // malloc a buffer for the data- may be large
   unsigned char* buffer = (unsigned char*) malloc(block_size * sizeof(char));
-  int hash_size = 32; 
+  int hash_size = 32;
 
   while (remaining > 0) {
     number_hashes = number_hashes + 1;
@@ -370,6 +379,44 @@ int hashAndAppend(const char* file_name, const char* key){
   fclose (fp);
 
   return 0;
+}
+
+int addReedSolomon(std::string ifn, std::string ofn){
+  //Code taken from Schifra example
+  const std::size_t field_descriptor    =   8;
+   const std::size_t gen_poly_index      = 120;
+   const std::size_t gen_poly_root_count =   6;
+   const std::size_t code_length         = 255;
+   const std::size_t fec_length          =   6;
+   const std::string input_file_name     = ifn;
+   const std::string output_file_name    = ofn;
+
+   typedef schifra::reed_solomon::encoder<code_length,fec_length> encoder_t;
+   typedef schifra::reed_solomon::file_encoder<code_length,fec_length> file_encoder_t;
+
+   const schifra::galois::field field(field_descriptor,
+                                      schifra::galois::primitive_polynomial_size06,
+                                      schifra::galois::primitive_polynomial06);
+
+   schifra::galois::field_polynomial generator_polynomial(field);
+
+   if (
+        !schifra::make_sequential_root_generator_polynomial(field,
+                                                            gen_poly_index,
+                                                            gen_poly_root_count,
+                                                            generator_polynomial)
+      )
+   {
+      std::cout << "Error - Failed to create sequential root generator!" << std::endl;
+      return 1;
+   }
+
+   const encoder_t rs_encoder(field,generator_polynomial);
+
+   file_encoder_t(rs_encoder, input_file_name, output_file_name);
+
+   return 0;
+
 }
 
 uint64_t writeDFS(node* node, FILE* output) {
@@ -401,7 +448,6 @@ uint64_t writeDFS(node* node, FILE* output) {
        while (0 < (bytes = fread(file_buffer, 1, sizeof(file_buffer), open_file))){
             fwrite(file_buffer, 1, bytes, output);
         }
-          std::cout << "not" << "\n";
         file_off += fileSize;
         header_off += M_HDR_SIZE;
         fclose(open_file);
