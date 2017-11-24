@@ -15,3 +15,4 @@ TODO:
 4. Consider header file (should elements be different sizes) 
 5. General code cleanup 
 6. Benchmarking 
+7. Stream implementation on write in Master
