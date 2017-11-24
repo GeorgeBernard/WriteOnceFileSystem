@@ -18,3 +18,9 @@ TODO:
 7. Stream implementation on write in Master
 8. Alignment
 9. Hard link and soft link investigation 
+
+Know limitations:
+
+* Size
+* ECC 
+* Hard-soft 
