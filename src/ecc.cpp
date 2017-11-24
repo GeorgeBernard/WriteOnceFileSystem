@@ -29,7 +29,7 @@
 #include "schifra/schifra_reed_solomon_file_decoder.hpp"
 
 
-int decode(std::string inFile, std::string outFile)
+extern "C" int decode(std::string inFile, std::string outFile)
 {
    const std::size_t field_descriptor    =   8;
    const std::size_t gen_poly_index      = 120;

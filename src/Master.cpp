@@ -151,10 +151,11 @@ int run(std::string root_directory, std::string wofs_filename, std::string key){
   << std::endl;
   node* r = &root;
   int imageStatus = imageDFS(pre_filename, r);
-  std::cout << "Converting to Reed Solomon Error Correcting Blocks, outputing to: " << wofs_filename << "\n";
-  int reedSolomonStatus = addReedSolomon(pre_filename,wofs_filename);
   std::cout << "Appending Sha256 Hash using Key" << "\n";
-  int hashStatus = hashAndAppend(wofs_filename.c_str(), key.c_str());
+  int hashStatus = hashAndAppend(pre_filename.c_str(), key.c_str());
+  //std::cout << "Converting to Reed Solomon Error Correcting Blocks, outputing to: " << wofs_filename << "\n";
+  int reedSolomonStatus = addReedSolomon(pre_filename,wofs_filename);
+  //int hashStatus = hashAndAppend(pre_filename.c_str(), pre_filename.c_str(), key.c_str());
   return 0;
 }
 

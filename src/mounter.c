@@ -11,6 +11,8 @@
 #include <endian.h>
 #include <openssl/hmac.h>
 
+#include "ecc.cpp"
+
 static long HASH_BLOCK_SIZE = 1000;
 FILE* fp;
 
@@ -170,9 +172,9 @@ static int mount_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	m_hdr* dir_header;
 	if (strcmp(path, "/") == 0) {
 		dir_header = readHeader(0);
-		filler(buf, ".", NULL, 0, 0);
-		filler(buf, "..", NULL, 0, 0);
-		filler(buf, dir_header -> name, NULL, 0, 0);
+		filler(buf, ".", NULL, 0, static_cast<fuse_fill_dir_flags>(0));
+		filler(buf, "..", NULL, 0, static_cast<fuse_fill_dir_flags>(0));
+		filler(buf, dir_header -> name, NULL, 0, static_cast<fuse_fill_dir_flags>(0));
 		return 0;
 	} else {
 		dir_header = find(path);
@@ -187,8 +189,8 @@ static int mount_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	}
 
 	// Fill the buffer with . and ..
-	filler(buf, ".", NULL, 0, 0);
-	filler(buf, "..", NULL, 0, 0);
+	filler(buf, ".", NULL, 0, static_cast<fuse_fill_dir_flags>(0));
+	filler(buf, "..", NULL, 0, static_cast<fuse_fill_dir_flags>(0));
 
 	// Fill the buffer with all subdirectories
 	uint64_t initOffset = dir_header -> offset;
@@ -196,7 +198,7 @@ static int mount_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
 		uint64_t next_header_block = read64(nextOffset);
 		m_hdr* child = readHeader(next_header_block);
-		filler(buf, child->name, NULL, 0, 0);
+		filler(buf, child->name, NULL, 0, static_cast<fuse_fill_dir_flags>(0));
 	}
 
 	return 0;
@@ -240,7 +242,7 @@ static int mount_read(const char *path, char *buf, size_t size, off_t offset,
 	size_t length = file_header -> length;
 	uint64_t data_block_offset = file_header -> offset;
 	fseek(fp, data_block_offset, SEEK_SET);
-	char* data_buffer = malloc(length);
+	char* data_buffer = (char*) malloc(length);
 	fread((void*)data_buffer, 1, length, fp);
 	len = strlen(data_buffer);
 	
@@ -257,6 +259,7 @@ static int mount_read(const char *path, char *buf, size_t size, off_t offset,
 
 int checkHash(const char* file_name, const char* key) {
 	
+	printf("file name: %s key: %s \n", file_name, key);
 	struct stat st;
  	stat(file_name, &st);
   	long file_size = st.st_size;
@@ -266,6 +269,7 @@ int checkHash(const char* file_name, const char* key) {
   	// Determine the number of hashes that was generated during mastering
   	uint64_t number_hash_location = file_size - sizeof(uint32_t);
 	uint32_t number_hashes = read32(fp, number_hash_location);
+	printf("Number hashes: %d \n", number_hashes);
 	uint64_t hashes_offset = number_hash_location - hash_size * number_hashes;
 	uint64_t image_size = hashes_offset;
 	uint64_t remaining = image_size;
@@ -277,6 +281,7 @@ int checkHash(const char* file_name, const char* key) {
 	int block_size = HASH_BLOCK_SIZE;
 	int hash_count = 0; // running tally of number of hashes checked
 
+	printf("Block size: %d \n", block_size);
 	// malloc the buffer because it could be large
 	unsigned char* buffer = (unsigned char*) malloc(block_size * sizeof(char));
 	if (buffer == NULL) {
@@ -300,6 +305,7 @@ int checkHash(const char* file_name, const char* key) {
 
 	  	// compare the two hashes
 	  	for (int i =0; i< hash_size; i++) {
+	  		//printf("mastered hash: %02x\ndigest: %02x \n", mastered_hash, digest);
 	    	if ((unsigned char) mastered_hash[i] != digest[i]) {
 	    		free(buffer);
 	      		return 0;
@@ -352,13 +358,16 @@ static void show_help(const char *progname)
 	       "\n");
 }
 
-static struct fuse_operations mount_oper = {
-	.init           = mount_init,
-	.getattr	= mount_getattr,
-	.readdir	= mount_readdir,
-	.open		= mount_open,
-	.read		= mount_read,
-};
+static struct mount_opereration : fuse_operations {
+
+	mount_opereration() {
+		init       	= mount_init;
+		getattr		= mount_getattr;
+		readdir		= mount_readdir;
+		open		= mount_open;
+		read		= mount_read;
+	}
+} mount_oper_init;
 
 int main(int argc, char *argv[])
 {
@@ -384,21 +393,28 @@ int main(int argc, char *argv[])
 	} else {
 		file_name = options.filename;
 	}
-	fp = fopen(file_name, "r");
 
 	// Verify the validity of the image
 	if (!options.key) {
 		printf("Please specify a key \n");
 		exit_program();
 	}
-	int hash_correct = checkHash(file_name, options.key);
+
+	std::string infile = "/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs";
+	std::string outfile = infile + ".necc2";
+
+  	int decodeResults = decode(infile, outfile);
+  	fp = fopen(outfile.c_str(), "r");
+	int hash_correct = checkHash(outfile.c_str(), options.key);
 
 	if (!hash_correct) {
 		printf("Data integrity issue detected.\n");
 		printf("Please verify the key you are using is correct.\n");
 		printf("Please correct issue offline and remount.\n");
 		exit_program();
-	} 
+	} else {
+		printf("Hash passed \n");
+	}
 
-	return fuse_main(args.argc, args.argv, &mount_oper, NULL);
+	return fuse_main(args.argc, args.argv, &mount_oper_init, NULL);
 }
