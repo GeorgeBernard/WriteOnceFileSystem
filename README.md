@@ -18,6 +18,7 @@ TODO:
 7. Stream implementation on write in Master
 8. Alignment
 9. Hard link and soft link investigation 
+10. Safe traversal - to prevent segfaults 
 
 Know limitations:
 
