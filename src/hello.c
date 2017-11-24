@@ -399,7 +399,7 @@ int checkHash() {
 
 
   	// Make Hash
-  	const char* key = "stranger";
+  	const char* key = "strange";
   	unsigned char* digest;
   	digest = HMAC(EVP_sha256(), key, strlen(key), buffer, hashStart, NULL, NULL);
 
@@ -411,7 +411,7 @@ int checkHash() {
   	int r = 1;
 
   	for (int i =0; i< 32; i++) {
-    	printf("i: %d file: %x hash: %x \n", i, (unsigned char) hash[i], digest[i]);
+    	// printf("i: %d file: %x hash: %x \n", i, (unsigned char) hash[i], digest[i]);
     	if ((unsigned char) hash[i] != digest[i]) {
       	r = 0;
     	}
@@ -426,13 +426,20 @@ int main(int argc, char *argv[])
 	argsFuse[0] = argv[0];
 	argsFuse[1] = argv[1];
 	argsFuse[2] = argv[2];
-	struct fuse_args args = FUSE_ARGS_INIT(argc-1, argsFuse);
-
+	
 	fp = fopen("/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs", "r");
 
 	int hashCorrect = checkHash();
-	printf("Hash correct: %d\n", hashCorrect);
-	exit(0);
+	if (!hashCorrect) {
+		printf("Data integrity issue detected.\n");
+		printf("Please verify the key you are using is correct.\n");
+		printf("Please correct issue offline and remount.\n");
+		exit(0);
+	} else {
+		printf("Hash correct: %d\n", hashCorrect);
+	}
+	struct fuse_args args = FUSE_ARGS_INIT(argc, argsFuse);
+	
 	/* Set defaults -- we have to use strdup so that
 	   fuse_opt_parse can free the defaults if other
 	   values are specified */
