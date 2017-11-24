@@ -16,3 +16,5 @@ TODO:
 5. General code cleanup 
 6. Benchmarking 
 7. Stream implementation on write in Master
+8. Alignment
+9. Hard link and soft link investigation 
