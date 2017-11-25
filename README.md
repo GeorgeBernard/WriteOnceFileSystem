@@ -22,6 +22,7 @@ TODO:
   **DONE - tested on the links test folder** 
   Ignores concept of soft links and just treats them as "normal" 
 10. Safe traversal - to prevent segfaults 
+  **DONE in mount**
 
 Know limitations:
 
