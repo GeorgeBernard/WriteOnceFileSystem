@@ -23,28 +23,21 @@
 
 static int s_builder(const char *, const struct stat *, int, struct FTW *);
 int run(std::string, std::string, std::string);
-
 int imageDFS(const std::string& out_filename, node* root);
 uint64_t writeDFS(node* node, FILE* output);
 int hashAndAppend(const char*, const char*);
 int addReedSolomon(std::string ifs, std::string ofs);
-
 std::string parse_name(const std::string& path_name);
 std::string space_pad(const std::string& s);
-
 uint64_t find_header_size();
-
 void write64(uint64_t, FILE*);
 void write32(uint32_t, FILE*);
 
 static uint64_t header_off;
 static uint64_t file_off;
-
 const int MAX_METADATA = 1000;
 static int HASH_BLOCK_SIZE = 1024;
-
 m_prs* meta;
-
 int metadataPointer = 0;
 int header_count = 0;
 int subitems_count = 0;

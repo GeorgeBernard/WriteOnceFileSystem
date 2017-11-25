@@ -1,5 +1,8 @@
 #define FUSE_USE_VERSION 31
 
+#include "OnDiskStructure.h"
+#include "ecc.cpp"
+#include "readFunctions.cpp"
 #include <fuse.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,29 +15,11 @@
 #include <openssl/hmac.h>
 #include <math.h>
 
-#include "ecc.cpp"
-
 static long HASH_BLOCK_SIZE = 1024;
 FILE* fp;
 
-// TODO: remove once header is c compatible
-struct metadata_header {
-    char name[256];
-    uint64_t length;
-    uint64_t time;
-    uint64_t offset;
-    uint32_t type;
-};
-typedef struct metadata_header m_hdr;
-
 void exit_program();
 int checkHash(const char* file_name, const char* key);
-void exit_program();
-static m_hdr* readHeader(uint64_t curr_offset);
-static uint32_t read32(FILE* fp, uint64_t offset);
-static uint64_t read64(uint64_t offset);
-static uint32_t read32_pure(); // no offset seek beforehand. Take care when using
-static uint64_t read64_pure(); // no offset seek beforehand. Take care when using
 static m_hdr* find(const char* path);
 
 static void *mount_init(struct fuse_conn_info *conn,
@@ -43,47 +28,6 @@ static void *mount_init(struct fuse_conn_info *conn,
 	(void) conn;
 	cfg->kernel_cache = 1;
 	return NULL;
-}
-
-static uint64_t read64(uint64_t offset) {
-	fseek(fp, (long) offset, SEEK_SET);
-	return read64_pure();	
-}
-
-static uint64_t read64_pure() {
-	uint64_t data;
-	fread((void*)&data, sizeof(uint64_t), 1, fp);
-	return htobe64(data);	
-}
-
-static uint32_t read32(FILE* fp, uint64_t offset) {
-    fseek(fp, offset, SEEK_SET);
-    return read32_pure();
-}
-
-static uint32_t read32_pure() {
-	uint32_t data;
-	fread((void*)&data, sizeof(uint32_t), 1, fp);
-	return htobe32(data);	
-}
-
-static m_hdr* readHeader(uint64_t curr_offset) {
-
-	fseek(fp, curr_offset, SEEK_SET);
-
-	int name_length = 255;
-	char* root_name = (char*) malloc(name_length);
-	fread((void*)root_name, 1, name_length+1, fp);
-
-	fseek(fp, (long) curr_offset+name_length+1, SEEK_SET);
-
-	m_hdr* header = (m_hdr*) malloc(sizeof(m_hdr));
-	strncpy(header -> name, root_name, name_length+1);
-	header-> length = read64_pure();
-	header -> time = read64_pure();
-	header -> offset = read64_pure();
-	header -> type = read32_pure();
-	return header;
 }
 
 static m_hdr* find(const char* path) {
@@ -95,7 +39,7 @@ static m_hdr* find(const char* path) {
 	strcpy(pathCopy, path);
 	char* token = strtok(pathCopy, "/");
 
-	m_hdr* root = readHeader(0);
+	m_hdr* root = readHeader(fp, 0);
 	m_hdr* current = root;
 
 	while (token != NULL) {
@@ -117,8 +61,8 @@ static m_hdr* find(const char* path) {
 
 		for (int i =0; i< current -> length; i++) {
 			uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
-			uint64_t next_header_block = read64(nextOffset);
-			m_hdr* child = readHeader(next_header_block);
+			uint64_t next_header_block = read64(fp, nextOffset);
+			m_hdr* child = readHeader(fp, next_header_block);
 
 			if (strcmp(child -> name, token) == 0) {
 				current = child;
@@ -177,7 +121,7 @@ static int mount_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	m_hdr* dir_header;
 	if (strcmp(path, "/") == 0) {
-		dir_header = readHeader(0);
+		dir_header = readHeader(fp, 0);
 		filler(buf, ".", NULL, 0, static_cast<fuse_fill_dir_flags>(0));
 		filler(buf, "..", NULL, 0, static_cast<fuse_fill_dir_flags>(0));
 		filler(buf, dir_header -> name, NULL, 0, static_cast<fuse_fill_dir_flags>(0));
@@ -202,8 +146,8 @@ static int mount_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	uint64_t initOffset = dir_header -> offset;
 	for (int i =0; i< dir_header -> length; i++) {
 		uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
-		uint64_t next_header_block = read64(nextOffset);
-		m_hdr* child = readHeader(next_header_block);
+		uint64_t next_header_block = read64(fp, nextOffset);
+		m_hdr* child = readHeader(fp, next_header_block);
 		filler(buf, child->name, NULL, 0, static_cast<fuse_fill_dir_flags>(0));
 	}
 
@@ -265,7 +209,6 @@ static int mount_read(const char *path, char *buf, size_t size, off_t offset,
 
 int checkHash(const char* file_name, const char* key) {
 	
-	printf("file name: %s key: %s \n", file_name, key);
 	struct stat st;
  	stat(file_name, &st);
   	long file_size = st.st_size;
@@ -275,7 +218,6 @@ int checkHash(const char* file_name, const char* key) {
   	// Determine the number of hashes that was generated during mastering
   	uint64_t number_hash_location = file_size - sizeof(uint32_t);
 	uint32_t number_hashes = read32(fp, number_hash_location);
-	printf("Number hashes: %d \n", number_hashes);
 	uint64_t hashes_offset = number_hash_location - hash_size * number_hashes;
 	uint64_t image_size = hashes_offset;
 	uint64_t remaining = image_size;
@@ -287,7 +229,6 @@ int checkHash(const char* file_name, const char* key) {
 	int block_size = HASH_BLOCK_SIZE;
 	int hash_count = 0; // running tally of number of hashes checked
 
-	printf("Block size: %d \n", block_size);
 	// malloc the buffer because it could be large
 	unsigned char* buffer = (unsigned char*) malloc(block_size * sizeof(char));
 	if (buffer == NULL) {
@@ -308,7 +249,6 @@ int checkHash(const char* file_name, const char* key) {
 	  	fread(buffer, sizeof(char), block_size, fp);
 	  	unsigned char* digest;
 	  	digest = HMAC(EVP_sha256(), key, strlen(key), buffer, block_size, NULL, NULL);
-	  	printf("Digest: %02x \n", digest);
 	  	// compare the two hashes
 	  	for (int i =0; i< hash_size; i++) {
 	  		//printf("mastered hash: %02x\ndigest: %02x \n", mastered_hash, digest);
@@ -397,7 +337,7 @@ int main(int argc, char *argv[])
 	const char* file_name;
 	if (options.filename == NULL) {
 		// TODO: after developement, don't make this default
-		file_name = "/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs.necc";
+		file_name = "/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs";
 	} else {
 		file_name = options.filename;
 	}
@@ -413,10 +353,11 @@ int main(int argc, char *argv[])
 		outfile = file_name;
 	} else {
 		std::string infile = file_name;
-		std::string outfile = infile + ".necc2";
+		outfile = infile + ".rec";
   		int decodeResults = decode(infile, outfile);
 	}
-
+	std::cout << outfile << std::endl;
+	printf("Outfile: %s \n", outfile);
   	fp = fopen(outfile.c_str(), "r");
 	int hash_correct = checkHash(outfile.c_str(), options.key);
 
