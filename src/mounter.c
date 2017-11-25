@@ -16,6 +16,7 @@
 #include <math.h>
 
 static long HASH_BLOCK_SIZE = 1024;
+long image_file_size; 					// Stored to see if offset is safe or not
 FILE* fp;
 
 void exit_program();
@@ -38,7 +39,6 @@ static m_hdr* find(const char* path) {
 	char* pathCopy = (char*) malloc(strlen(path) + 1);
 	strcpy(pathCopy, path);
 	char* token = strtok(pathCopy, "/");
-
 	m_hdr* root = readHeader(fp, 0);
 	m_hdr* current = root;
 
@@ -62,6 +62,11 @@ static m_hdr* find(const char* path) {
 		for (int i =0; i< current -> length; i++) {
 			uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
 			uint64_t next_header_block = read64(fp, nextOffset);
+			if (next_header_block > image_file_size) {
+				printf("Attempting to traverse to a location out of range. \n");
+				printf("Please verify the correctness of the image \n");
+				exit_program();
+			}
 			m_hdr* child = readHeader(fp, next_header_block);
 
 			if (strcmp(child -> name, token) == 0) {
@@ -370,5 +375,8 @@ int main(int argc, char *argv[])
 		printf("Hash passed \n");
 	}
 
+	struct stat st;
+ 	stat(outfile.c_str(), &st);
+  	image_file_size = st.st_size;
 	return fuse_main(args.argc, args.argv, &mount_oper_init, NULL);
 }

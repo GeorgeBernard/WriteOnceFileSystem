@@ -1,3 +1,5 @@
+#include <cstring>
+
 static m_hdr* readHeader(FILE* fp, uint64_t curr_offset);
 static uint32_t read32(FILE* fp, uint64_t offset);
 static uint32_t read32_pure(FILE* fp); // no offset seek beforehand. Take care when using
