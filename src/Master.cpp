@@ -344,7 +344,7 @@ int hashAndAppend(const char* file_name, const char* key){
   struct stat st;
   stat(file_name, &st);
   long file_size = st.st_size;
-
+  std::cout << "file size: " << file_size << std::endl;
   if (HASH_BLOCK_SIZE > file_size) {
     HASH_BLOCK_SIZE = file_size;
   }
@@ -352,19 +352,23 @@ int hashAndAppend(const char* file_name, const char* key){
   long remaining = file_size;
   uint32_t number_hashes = 0;
   // malloc a buffer for the data- may be large
-  unsigned char* buffer = (unsigned char*) malloc(block_size * sizeof(char));
   int hash_size = 32;
 
   while (remaining > 0) {
     number_hashes = number_hashes + 1;
+    std::cout << "number hashes: " << number_hashes << std::endl;
     int data_location = (number_hashes-1) * HASH_BLOCK_SIZE;
+    std::cout << "data_location: " << data_location << std::endl;
     fseek(fp, data_location, SEEK_SET);
+
+    unsigned char buffer[block_size];
     int bytes_read = fread(buffer, sizeof(char), block_size, fp);
 
+    std::cout << "Buffer: " << buffer << std::endl;
     // make the hash Hash
     unsigned char* digest;
     digest = HMAC(EVP_sha256(), key, strlen(key), buffer, block_size, NULL, NULL);
-
+    
     // Append the Hash to the file
     fwrite (digest, sizeof(char), hash_size, fp);
 
@@ -372,7 +376,6 @@ int hashAndAppend(const char* file_name, const char* key){
     if (block_size > remaining) {
       block_size = remaining;
     }
-
   }
 
   // Write the number of hashes generated and close the file

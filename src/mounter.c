@@ -10,10 +10,11 @@
 #include <stdlib.h>
 #include <endian.h>
 #include <openssl/hmac.h>
+#include <math.h>
 
 #include "ecc.cpp"
 
-static long HASH_BLOCK_SIZE = 1000;
+static long HASH_BLOCK_SIZE = 1024;
 FILE* fp;
 
 // TODO: remove once header is c compatible
@@ -153,6 +154,11 @@ static int mount_getattr(const char *path, struct stat *stbuf,
 	} else if (head -> type == 1) { 		// File 
 		stbuf->st_mode = S_IFREG | 0444;	// Read only access
 		stbuf->st_size = head -> length;
+		double file_size = head->length;
+		double block_size = 4096;
+		stbuf->st_blksize = block_size;
+		int num_blocks = ceil(file_size/block_size); 
+		stbuf-> st_blocks = num_blocks;
 	} else {
 		res = -ENOENT;
 	}
@@ -302,7 +308,7 @@ int checkHash(const char* file_name, const char* key) {
 	  	fread(buffer, sizeof(char), block_size, fp);
 	  	unsigned char* digest;
 	  	digest = HMAC(EVP_sha256(), key, strlen(key), buffer, block_size, NULL, NULL);
-
+	  	printf("Digest: %02x \n", digest);
 	  	// compare the two hashes
 	  	for (int i =0; i< hash_size; i++) {
 	  		//printf("mastered hash: %02x\ndigest: %02x \n", mastered_hash, digest);
