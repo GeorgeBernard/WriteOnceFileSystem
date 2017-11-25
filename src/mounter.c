@@ -15,9 +15,10 @@
 #include <openssl/hmac.h>
 #include <math.h>
 
-static long HASH_BLOCK_SIZE = 1024;
+static long HASH_BLOCK_SIZE = 1048576;
 long image_file_size; 					// Stored to see if offset is safe or not
 FILE* fp;
+size_t prev_offset = 0;
 
 void exit_program();
 int checkHash(const char* file_name, const char* key);
@@ -92,6 +93,13 @@ static int mount_getattr(const char *path, struct stat *stbuf,
 	if(!path) { return -ENOENT; }
 
 	memset(stbuf, 0, sizeof(struct stat));
+
+	if (strcmp(path, "/") == 0) {
+		stbuf -> st_mode = S_IFDIR | 0444;	// Read only access
+		stbuf -> st_nlink = 2;
+		return res;
+	}
+
 	m_hdr* head = find(path);
 	if (head == NULL) {
 		return -ENOENT;
@@ -163,6 +171,7 @@ static int mount_open(const char *path, struct fuse_file_info *fi)
 {
 	m_hdr* file_header = find(path);
 
+
 	if (file_header == NULL) {			// File not found
 		return -ENOENT;
 	}
@@ -183,6 +192,7 @@ static int mount_read(const char *path, char *buf, size_t size, off_t offset,
 {
 	size_t len;
 	(void) fi;
+	//std::cout << "Mount read: " << path << std::endl;
 	
 	m_hdr* file_header = find(path);
 
@@ -194,13 +204,23 @@ static int mount_read(const char *path, char *buf, size_t size, off_t offset,
 		return -ENOENT;
 	}
 
+
 	size_t length = file_header -> length;
+	//std::cout << "length: " << length << std::endl;
 	uint64_t data_block_offset = file_header -> offset;
 	fseek(fp, data_block_offset, SEEK_SET);
 	char* data_buffer = (char*) malloc(length);
 	fread((void*)data_buffer, 1, length, fp);
 	len = strlen(data_buffer);
-	
+
+	len = length;
+
+
+	//std::cout << "len: " << len << std::endl;
+	//std::cout << "offset: " << offset << std::endl;
+	//std::cout << "prev: " << prev_offset << std::endl; 
+ 	//std::cout << "size: " << size << std::endl;
+ 	//std::cout << "diff: " << offset - prev_offset << std::endl;
 	if (offset < len) {
 		if (offset + size > len)
 			size = len - offset;
@@ -208,7 +228,9 @@ static int mount_read(const char *path, char *buf, size_t size, off_t offset,
 	} else
 		size = 0;
 
+	//std::cout << "size of buf: " << strlen(buf) << std::endl;
 	free(data_buffer);
+	prev_offset = offset;
 	return size;
 }
 
@@ -337,20 +359,25 @@ int main(int argc, char *argv[])
 		show_help(argv[0]);
 		assert(fuse_opt_add_arg(&args, "--help") == 0);
 		args.argv[0] = (char*) "";
+		printf("\n \nHelp indicated...exiting program. \n");
+		printf("Please run program without help. -h flag\n");
+		exit(0);
 	}
 
 	const char* file_name;
 	if (options.filename == NULL) {
-		// TODO: after developement, don't make this default
-		file_name = "/home/ras70/mounting/WriteOnceFileSystem/src/test.wofs";
+		printf("Please specify a path to the image \n");
+		printf("Use --image=<image_name> \n");
+		exit(0);
 	} else {
-		file_name = options.filename;
+		file_name = realpath(options.filename, NULL);
 	}
 
 	// Verify the validity of the image
 	if (!options.key) {
 		printf("Please specify a key \n");
-		exit_program();
+		printf("Use --key=<key> \n");
+		exit(0);
 	}
 
 	std::string outfile;
@@ -361,8 +388,6 @@ int main(int argc, char *argv[])
 		outfile = infile + ".rec";
   		int decodeResults = decode(infile, outfile);
 	}
-	std::cout << outfile << std::endl;
-	printf("Outfile: %s \n", outfile);
   	fp = fopen(outfile.c_str(), "r");
 	int hash_correct = checkHash(outfile.c_str(), options.key);
 
@@ -378,5 +403,6 @@ int main(int argc, char *argv[])
 	struct stat st;
  	stat(outfile.c_str(), &st);
   	image_file_size = st.st_size;
+  	std::cout << "file size:  " << image_file_size << std::endl;
 	return fuse_main(args.argc, args.argv, &mount_oper_init, NULL);
 }

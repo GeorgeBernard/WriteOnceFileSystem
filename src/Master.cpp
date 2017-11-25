@@ -36,31 +36,23 @@ void write32(uint32_t, FILE*);
 static uint64_t header_off;
 static uint64_t file_off;
 const int MAX_METADATA = 1000;
-static int HASH_BLOCK_SIZE = 1024;
+static long HASH_BLOCK_SIZE = 1048576;
 m_prs* meta;
 int metadataPointer = 0;
 int header_count = 0;
 int subitems_count = 0;
 std::stack<node> directories;
+int ECC = 1;
 
 int main(int argc, char **argv){
 
-  // PREVIOUS FUNCTIONAL CODE: ensure input is appropriate
-  // if(argc != 3){
-  //     if(argc < 2){
-  //     	std::cout << "First argument must be a directory to master." << '\n';
-  //     }
-  //     if(argc < 3){
-  //     	std::cout << "Second argument must be an output filename" << '\n';
-  //     }
-  //     return EXIT_FAILURE;
-  // }
   try{
     cxxopts::Options options("Master", "Takes in a directory and outputs an imaged File System");
     options.add_options()
     ("o,output", "Name of output filename", cxxopts::value<std::string>())
     ("p,path", "relative path to directory to master", cxxopts::value<std::string>())
     ("k,key", "Key for sha256 hashing", cxxopts::value<std::string>())
+    ("n,necc", "No ECC codes")
     ;
     options.parse(argc, argv);
 
@@ -78,6 +70,12 @@ int main(int argc, char **argv){
       std::cout << "please enter a key to use for security" << std::endl;
       return 0;
     }
+    if (options.count("necc")!=1) {
+      ECC = 1;
+    } else {
+      ECC =0;
+    }
+
     run(options["path"].as<std::string>(), options["output"].as<std::string>(), options["key"].as<std::string>());
   } catch (...) { // shouldn't get to here
     std::exception_ptr p = std::current_exception();
@@ -138,6 +136,7 @@ int run(std::string root_directory, std::string wofs_filename, std::string key){
   }
 
   std::string pre_filename = wofs_filename + ".necc";
+
   // Now write the file to a structure
   std::cout << "Writing " << header_count << " files/directories to "
   << '\"' << pre_filename << '\"'
@@ -146,9 +145,13 @@ int run(std::string root_directory, std::string wofs_filename, std::string key){
   int imageStatus = imageDFS(pre_filename, r);
   std::cout << "Appending Sha256 Hash using Key" << "\n";
   int hashStatus = hashAndAppend(pre_filename.c_str(), key.c_str());
-  //std::cout << "Converting to Reed Solomon Error Correcting Blocks, outputing to: " << wofs_filename << "\n";
-  int reedSolomonStatus = addReedSolomon(pre_filename,wofs_filename);
-  //int hashStatus = hashAndAppend(pre_filename.c_str(), pre_filename.c_str(), key.c_str());
+  if (ECC) {
+    std::cout << "Applying error correcting codes to " 
+     << '\"' << pre_filename << '\"'
+     << " to create " 
+     << '\"' << wofs_filename << '\"' << std::endl;
+    int reedSolomonStatus = addReedSolomon(pre_filename,wofs_filename);
+  }
   return 0;
 }
 
@@ -337,7 +340,7 @@ int hashAndAppend(const char* file_name, const char* key){
   struct stat st;
   stat(file_name, &st);
   long file_size = st.st_size;
-  std::cout << "file size: " << file_size << std::endl;
+
   if (HASH_BLOCK_SIZE > file_size) {
     HASH_BLOCK_SIZE = file_size;
   }
@@ -349,15 +352,12 @@ int hashAndAppend(const char* file_name, const char* key){
 
   while (remaining > 0) {
     number_hashes = number_hashes + 1;
-    std::cout << "number hashes: " << number_hashes << std::endl;
     int data_location = (number_hashes-1) * HASH_BLOCK_SIZE;
-    std::cout << "data_location: " << data_location << std::endl;
     fseek(fp, data_location, SEEK_SET);
 
     unsigned char buffer[block_size];
     int bytes_read = fread(buffer, sizeof(char), block_size, fp);
 
-    std::cout << "Buffer: " << buffer << std::endl;
     // make the hash Hash
     unsigned char* digest;
     digest = HMAC(EVP_sha256(), key, strlen(key), buffer, block_size, NULL, NULL);
@@ -380,11 +380,11 @@ int hashAndAppend(const char* file_name, const char* key){
 
 int addReedSolomon(std::string ifn, std::string ofn){
   //Code taken from Schifra example
-  const std::size_t field_descriptor    =   8;
+   const std::size_t field_descriptor    =   8;
    const std::size_t gen_poly_index      = 120;
    const std::size_t gen_poly_root_count =   6;
    const std::size_t code_length         = 255;
-   const std::size_t fec_length          =   6;
+   const std::size_t fec_length          = 6;
    const std::string input_file_name     = ifn;
    const std::string output_file_name    = ofn;
 
