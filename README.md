@@ -29,6 +29,7 @@ Parameters:
 * -o/--out=: output file name
 * -p/-path=: path to directory/file to image
 * -k/--key=: key for sha256 hash
+* -n/necc: Do not error correcting - output file name with ".necc" appended
 
 ![Mastering Overview](./master.png)
 
