@@ -15,9 +15,12 @@ TODO:
 4. Consider header file (should elements be different sizes) 
 5. General code cleanup 
 6. Benchmarking 
-7. Stream implementation on write in Master       **DONE**
+7. Stream implementation on write in Master       
+  **DONE**
 8. Alignment
-9. Hard link and soft link investigation 
+9. Hard link and soft link investigation          
+  **DONE - tested on the links test folder** 
+  Ignores concept of soft links and just treats them as "normal" 
 10. Safe traversal - to prevent segfaults 
 
 Know limitations:
