@@ -12,9 +12,30 @@ The mounting program takes in either a image with or without ECC and a key and m
 
 The tree program is an additional program that takes in an image file an outputs the file structure. It is helpful in verifying the validity and structure of image files without mounting. The tree program is designed to take in a pure image file with no ECC. A file with ECC can be extracted to an image file without ECC using the `decode` method in the `ecc.cpp` file.  
 
-## On Disk Structure 
+## On-Disk Structure 
+
+The on-disk structure is divided into three main sections:
+1. Metadata section 
+2. File data
+3. Hashes 
+
+![On-disk Structure Overview](OnDiskStructure.png)
+
+The metadata section and file data are made into blocks of fixed size and each block is hashed with the key appended. Each hash is of fixed size (32 bytes). There is an additional integer appended to the end of the on-disk structure to indicate how many hashes are present. 
 
 ##### Imaging 
+
+The file structure is imaged in a DFS fashion. This is best seen through an example:
+
+![Sample File Structure](./sampleFileStructure.png)
+
+Above is a sample file structure. dirA is the root directory, with two subdirectories dirB and dirC. dirB has one subdirectory, dirD, that holds a single file, a.txt. The imaging process would produce the following header structure on disk:
+
+![Header Section](./dfs.png)
+
+The first header is dirA, the root. Each header is indicated in blue. Directory headers are followed by a list of offset that point to the location of their child directories. The two gray offsets following the dirA header block point to its children dirB and dirC. dirB is the next header on disk. It has an offset list with one element, which points to dirD. dirD also has one element, an offset that gives the location of the a.txt header block. The a.txt header block points to the offset of its data in the data section of the image. 
+
+Once, the headers of **all** of dirB's contents are written to disk then dirC is written to disk. For this reason the imaging follows closely a DFS, opposed to a BFS approach. In other words, the imaging process traverses the depth of the structure until it hits leaf components, rather than writing layer by layer. This implementation was chosen because it is difficult to write the structure to disk without knowing the *total* number of elements under a given directory. Therefore, the depth first approach is preferred. We suspect that the performance between the two approaches is neglible and depends on the access pattern. Either way a majority of the header section should be in cache and we do not anticipate the traversal method having an impact on performance. 
 
 ## Theory
 
