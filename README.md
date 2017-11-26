@@ -16,6 +16,13 @@ The tree program is an additional program that takes in an image file an outputs
 
 ##### Imaging 
 
+## Theory
+
+### Reed Solomon
+Our project allows for error corrections through Reed Solomon correction codes.  More specifically, we divide the image file into blocks of XXXX bytes, and then add code on the end in order to correct up to XXX byte level errors. These blocks are then saved in order in a copy of the file, rendering unreadable to the previous progams, but now safely packaged to prevent errors.  Once the file is in its final destination, these same parameters are read in to decode the blocks and write the file out in its original form.
+
+### Sha256
+in order to prevent any tinkering with the file from malicious sources, we save a simple sha256 hash of the original file with a secret.  This hash is then appended to the file after Reed Solomon was applied.  Sha 256 works by creating a 256 bit hash of any provided code, when a secret word is used in addition to the data, then only other with knowledge of the secret key will be able to reproduce a working hash.  This allows us to ensure that the data has not been tampered with in transition, and further allows us to check that the ECC has recreated the correct data.  
 
 ## Usage
 
