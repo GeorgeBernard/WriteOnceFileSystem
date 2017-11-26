@@ -14,8 +14,9 @@
 #include <endian.h>
 #include <openssl/hmac.h>
 #include <math.h>
+#include "config/hashConstants.c"
 
-static long HASH_BLOCK_SIZE = 1048576;
+static long HASH_BLOCK_SIZE = DEF_HASH_BLOCK_SIZE;
 long image_file_size; 					// Stored to see if offset is safe or not
 FILE* fp;
 size_t prev_offset = 0;
@@ -387,6 +388,12 @@ int main(int argc, char *argv[])
 		std::string infile = file_name;
 		outfile = infile + ".rec";
   		int decodeResults = decode(infile, outfile);
+  		if (decodeResults) {
+  			printf("Unable to recover image from error correcing codes \n");
+  			printf("Decoding exited with error status: %d\n", decodeResults);
+  			printf("Please default to backups \n");
+  			exit(0);
+  		}
 	}
   	fp = fopen(outfile.c_str(), "r");
 	int hash_correct = checkHash(outfile.c_str(), options.key);

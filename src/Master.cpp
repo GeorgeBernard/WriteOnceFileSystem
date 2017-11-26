@@ -13,13 +13,14 @@
 #include <queue>
 #include <openssl/hmac.h>
 #include <cstddef>
-
 #include "cxxopts.hpp"
 #include "OnDiskStructure.h"
 #include "schifra/schifra_galois_field.hpp"
 #include "schifra/schifra_sequential_root_generator_polynomial_creator.hpp"
 #include "schifra/schifra_reed_solomon_encoder.hpp"
 #include "schifra/schifra_reed_solomon_file_encoder.hpp"
+#include "config/decodeConstants.c"
+#include "config/hashConstants.c"
 
 static int s_builder(const char *, const struct stat *, int, struct FTW *);
 int run(std::string, std::string, std::string);
@@ -36,7 +37,8 @@ void write32(uint32_t, FILE*);
 static uint64_t header_off;
 static uint64_t file_off;
 const int MAX_METADATA = 1000;
-static long HASH_BLOCK_SIZE = 1048576;
+static long HASH_BLOCK_SIZE = DEF_HASH_BLOCK_SIZE;
+
 m_prs* meta;
 int metadataPointer = 0;
 int header_count = 0;
@@ -380,11 +382,11 @@ int hashAndAppend(const char* file_name, const char* key){
 
 int addReedSolomon(std::string ifn, std::string ofn){
   //Code taken from Schifra example
-   const std::size_t field_descriptor    =   8;
-   const std::size_t gen_poly_index      = 120;
-   const std::size_t gen_poly_root_count =   6;
-   const std::size_t code_length         = 255;
-   const std::size_t fec_length          = 6;
+   const std::size_t field_descriptor    = FIELD_DESCRIPTOR;
+   const std::size_t gen_poly_index      = GEN_POLY_INDEX;
+   const std::size_t gen_poly_root_count = ROOT_COUNT;
+   const std::size_t code_length         = CODE_LENGTH;
+   const std::size_t fec_length          =   FEC_LENGTH;
    const std::string input_file_name     = ifn;
    const std::string output_file_name    = ofn;
 

@@ -1,40 +1,21 @@
-/*
-(**************************************************************************)
-(*                                                                        *)
-(*                                Schifra                                 *)
-(*                Reed-Solomon Error Correcting Code Library              *)
-(*                                                                        *)
-(* Release Version 0.0.1                                                  *)
-(* http://www.schifra.com                                                 *)
-(* Copyright (c) 2000-2017 Arash Partow, All Rights Reserved.             *)
-(*                                                                        *)
-(* The Schifra Reed-Solomon error correcting code library and all its     *)
-(* components are supplied under the terms of the General Schifra License *)
-(* agreement. The contents of the Schifra Reed-Solomon error correcting   *)
-(* code library and all its components may not be copied or disclosed     *)
-(* except in accordance with the terms of that agreement.                 *)
-(*                                                                        *)
-(* URL: http://www.schifra.com/license.html                               *)
-(*                                                                        *)
-(**************************************************************************)
-*/
-
-
 #include <cstddef>
 #include <string>
-
+#include <iostream>
+#include <fstream>
+#include "schifra/schifra_reed_solomon_block.hpp"
+#include "schifra/schifra_fileio.hpp"
 #include "schifra/schifra_galois_field.hpp"
 #include "schifra/schifra_sequential_root_generator_polynomial_creator.hpp"
 #include "schifra/schifra_reed_solomon_decoder.hpp"
-#include "schifra/schifra_reed_solomon_file_decoder.hpp"
+#include "fileDecoder.cpp"
+#include "config/decodeConstants.c"
 
-
-extern "C" int decode(std::string inFile, std::string outFile)
+int decode(std::string inFile, std::string outFile)
 {
-   const std::size_t field_descriptor    =   8;
-   const std::size_t gen_poly_index      = 120;
-   const std::size_t code_length         = 255;
-   const std::size_t fec_length          =   6;
+   const std::size_t field_descriptor    = FIELD_DESCRIPTOR;
+   const std::size_t gen_poly_index      = GEN_POLY_INDEX;
+   const std::size_t code_length         = CODE_LENGTH;
+   const std::size_t fec_length          =   FEC_LENGTH;
    const std::string input_file_name     = inFile;
    const std::string output_file_name    = outFile;
 
@@ -47,7 +28,8 @@ extern "C" int decode(std::string inFile, std::string outFile)
 
    const decoder_t rs_decoder(field,gen_poly_index);
 
-   file_decoder_t(rs_decoder, input_file_name, output_file_name);
-
-   return 0;
+   file_decoder_t* fd = new file_decoder_t();
+   int decode_success = fd -> decode_file(rs_decoder, input_file_name, output_file_name);
+   free(fd);
+   return decode_success;
 }
