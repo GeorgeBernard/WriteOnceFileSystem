@@ -1,1 +1,1 @@
-long DEF_HASH_BLOCK_SIZE = 1048576; // Block size used for hashing
+unsigned long DEF_HASH_BLOCK_SIZE = 1048576; // Block size used for hashing
