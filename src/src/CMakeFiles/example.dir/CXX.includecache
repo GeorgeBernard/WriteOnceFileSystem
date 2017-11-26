@@ -1,0 +1,40 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/vcm/WriteOnceFileSystem/src/cxxopts/src/example.cpp
+iostream
+-
+cxxopts.hpp
+/home/vcm/WriteOnceFileSystem/src/cxxopts/src/cxxopts.hpp
+
+cxxopts/include/cxxopts.hpp
+cstring
+-
+cctype
+-
+exception
+-
+iostream
+-
+map
+-
+memory
+-
+regex
+-
+sstream
+-
+string
+-
+unordered_set
+-
+vector
+-
+unicode/unistr.h
+-
+
