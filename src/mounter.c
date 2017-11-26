@@ -1,5 +1,7 @@
 #define FUSE_USE_VERSION 31
 
+//================================= Includes =================================//
+
 #include "OnDiskStructure.h"
 #include "ecc.cpp"
 #include "readFunctions.cpp"
@@ -15,6 +17,10 @@
 #include <openssl/hmac.h>
 #include <math.h>
 #include "config/hashConstants.c"
+
+//========================== Function Declarations ===========================//
+
+static void *mount_init(struct fuse_conn_info *conn, struct fuse_config *cfg);
 
 static unsigned long HASH_BLOCK_SIZE = DEF_HASH_BLOCK_SIZE;
 unsigned long image_file_size; 		// Stored to see if offset is safe or not
