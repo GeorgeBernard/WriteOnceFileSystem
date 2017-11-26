@@ -37,7 +37,7 @@ void write32(uint32_t, FILE*);
 static uint64_t header_off;
 static uint64_t file_off;
 const int MAX_METADATA = 1000;
-static long HASH_BLOCK_SIZE = DEF_HASH_BLOCK_SIZE;
+static unsigned long HASH_BLOCK_SIZE = DEF_HASH_BLOCK_SIZE;
 
 m_prs* meta;
 int metadataPointer = 0;
@@ -77,6 +77,14 @@ int main(int argc, char **argv){
     } else {
       ECC =0;
     }
+
+    struct stat st;
+    const char* path = options["path"].as<std::string>().c_str();
+    int ableToFind = stat(path, &st);
+    if (ableToFind == -1) { // Path does not exist
+      std::cout << path << " does not exist" << std::endl;
+      exit(0);
+    } 
 
     run(options["path"].as<std::string>(), options["output"].as<std::string>(), options["key"].as<std::string>());
   } catch (...) { // shouldn't get to here
@@ -442,7 +450,6 @@ uint64_t writeDFS(node* node, FILE* output) {
     if (blockSize > fileSize) {
       blockSize = fileSize;
     }
-    std::cout << "Attempting to write" <<std::endl;
     FILE* open_file = fopen((node->data->p), "r");
     char* file_buffer[blockSize];
     while (remaining > 0) {

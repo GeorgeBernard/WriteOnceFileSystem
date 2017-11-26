@@ -16,8 +16,8 @@
 #include <math.h>
 #include "config/hashConstants.c"
 
-static long HASH_BLOCK_SIZE = DEF_HASH_BLOCK_SIZE;
-long image_file_size; 					// Stored to see if offset is safe or not
+static unsigned long HASH_BLOCK_SIZE = DEF_HASH_BLOCK_SIZE;
+unsigned long image_file_size; 		// Stored to see if offset is safe or not
 FILE* fp;
 size_t prev_offset = 0;
 
@@ -61,7 +61,7 @@ static m_hdr* find(const char* path) {
 		uint64_t initOffset = current -> offset;
 		int childFound = 0;
 
-		for (int i =0; i< current -> length; i++) {
+		for (unsigned int i =0; i< current -> length; i++) {
 			uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
 			uint64_t next_header_block = read64(fp, nextOffset);
 			if (next_header_block > image_file_size) {
@@ -158,7 +158,7 @@ static int mount_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	// Fill the buffer with all subdirectories
 	uint64_t initOffset = dir_header -> offset;
-	for (int i =0; i< dir_header -> length; i++) {
+	for (unsigned int i =0; i< dir_header -> length; i++) {
 		uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
 		uint64_t next_header_block = read64(fp, nextOffset);
 		m_hdr* child = readHeader(fp, next_header_block);
@@ -207,29 +207,20 @@ static int mount_read(const char *path, char *buf, size_t size, off_t offset,
 
 
 	size_t length = file_header -> length;
-	//std::cout << "length: " << length << std::endl;
 	uint64_t data_block_offset = file_header -> offset;
 	fseek(fp, data_block_offset, SEEK_SET);
 	char* data_buffer = (char*) malloc(length);
 	fread((void*)data_buffer, 1, length, fp);
-	len = strlen(data_buffer);
-
+	//len = strlen(data_buffer);
 	len = length;
 
-
-	//std::cout << "len: " << len << std::endl;
-	//std::cout << "offset: " << offset << std::endl;
-	//std::cout << "prev: " << prev_offset << std::endl; 
- 	//std::cout << "size: " << size << std::endl;
- 	//std::cout << "diff: " << offset - prev_offset << std::endl;
-	if (offset < len) {
+	if ((unsigned uint64_t) offset < len) {
 		if (offset + size > len)
 			size = len - offset;
 		memcpy(buf, data_buffer + offset, size);
 	} else
 		size = 0;
 
-	//std::cout << "size of buf: " << strlen(buf) << std::endl;
 	free(data_buffer);
 	prev_offset = offset;
 	return size;
@@ -288,7 +279,7 @@ int checkHash(const char* file_name, const char* key) {
 
 	  	hash_count = hash_count + 1;
 	  	remaining = remaining - block_size;
-	  	if (block_size > remaining) {
+	  	if ((uint64_t) block_size > remaining) {
 	  		block_size = remaining;
 	  	}
 	  	hashes_offset = hashes_offset + hash_size;
@@ -365,12 +356,21 @@ int main(int argc, char *argv[])
 		exit(0);
 	}
 
+	const char* original_path;
 	const char* file_name;
 	if (options.filename == NULL) {
 		printf("Please specify a path to the image \n");
 		printf("Use --image=<image_name> \n");
 		exit(0);
 	} else {
+		// Verify the path exists
+		struct stat st;
+    	original_path = options.filename;
+    	int ableToFind = stat(original_path, &st);
+    	if (ableToFind == -1) { // Path does not exist
+      		printf("%s does not exist\n Please enter a valid path\n", original_path);
+      		exit(0);
+    	} 
 		file_name = realpath(options.filename, NULL);
 	}
 
@@ -397,7 +397,7 @@ int main(int argc, char *argv[])
 	}
   	fp = fopen(outfile.c_str(), "r");
 	int hash_correct = checkHash(outfile.c_str(), options.key);
-
+	printf("Verifying hash... \n \n");
 	if (!hash_correct) {
 		printf("Data integrity issue detected.\n");
 		printf("Please verify the key you are using is correct.\n");
@@ -410,6 +410,6 @@ int main(int argc, char *argv[])
 	struct stat st;
  	stat(outfile.c_str(), &st);
   	image_file_size = st.st_size;
-  	std::cout << "file size:  " << image_file_size << std::endl;
+  	printf("Image %s mounted successfully \n", original_path);
 	return fuse_main(args.argc, args.argv, &mount_oper_init, NULL);
 }
