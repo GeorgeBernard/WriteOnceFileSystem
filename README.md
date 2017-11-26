@@ -82,7 +82,7 @@ Parameters:
 * --necc: flag to do no error correcting before mounting
 * Any other FUSE flags 
 
-**image 3** 
+![Mounting overview](./mounting.png "Mounting Overview")
 
 Mounting follows a linear pipeline. It takes the input file and error corrects it, unless indicated by the --necc flag not to. Then the program verifies the validity of the image by appending the key to the image and hashing it. This hash is compared to that recorded on the image. Then the file system is mounted. The image file is then traversed to handle any necessary incoming IO requests on the mounted image. 
 
