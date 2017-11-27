@@ -14,14 +14,10 @@ printf "\n \n"
 
 #-------------------------------- Add Git Repo --------------------------------#
 echo "---Get a repo to master---"
+echo "We will be using the classroom directory"
 read -p "Press any key to begin..." -n1 -s
 
 printf "\n \n \n"
-
-echo -n -e "${GRAY}"
-git clone https://github.com/andrewhao/git-poems.git
-rm -rf git-poems/.git
-echo -n -e "${NC}"
 
 #--------------------------------- Mastering ----------------------------------#
 
@@ -38,7 +34,7 @@ while [[ -z "${key// }" ]]; do
     read key
 done
 
-path="./git-poems"
+path="./Classwork"
 output="./image.wofs"
 
 printf "\n"
