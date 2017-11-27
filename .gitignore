@@ -1,9 +1,15 @@
 # Compiled object files
 *.o
 
+# Libraries
+fuse
+
 # Generated image files
 *.wfs
 *.wofs
+*.rec
+*.necc
 
 # Executables
 *.out
+hello

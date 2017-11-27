@@ -1,0 +1,3 @@
+fio: opendir added 1 files
+fio: failed parsing allow_file_create=false
+fio: job global dropped
