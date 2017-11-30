@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <sys/stat.h>
@@ -21,6 +22,7 @@
 #include "schifra/schifra_reed_solomon_file_encoder.hpp"
 #include "config/decodeConstants.c"
 #include "config/hashConstants.c"
+#include "requestKey.cpp"
 
 static int s_builder(const char *, const struct stat *, int, struct FTW *);
 int run(std::string, std::string, std::string);
@@ -33,6 +35,7 @@ std::string space_pad(const std::string& s);
 uint64_t find_header_size();
 void write64(uint64_t, FILE*);
 void write32(uint32_t, FILE*);
+void display_help(const char* progname);
 
 static uint64_t header_off;
 static uint64_t file_off;
@@ -53,25 +56,36 @@ int main(int argc, char **argv){
     options.add_options()
     ("o,output", "Name of output filename", cxxopts::value<std::string>())
     ("p,path", "relative path to directory to master", cxxopts::value<std::string>())
-    ("k,key", "Key for sha256 hashing", cxxopts::value<std::string>())
     ("n,necc", "No ECC codes")
+    ("h,help", "Show help")
     ;
     options.parse(argc, argv);
 
+    if (options.count("help")==1) {
+      std::cout << "Help flag indicated." << std::endl;
+      std::cout << "Showing help and exiting." <<std::endl << std::endl;
+      display_help(argv[0]);
+      exit(1);
+    }
+
     if(options.count("output")!=1){
-      std::cout << "please enter an output file name" << std::endl;
+      std::cout << "Please enter an output file name" << std::endl;
       return 0;
     }
 
     if(options.count("path")!=1){
-      std::cout << "please enter a directory to parse" << std::endl;
+      std::cout << "Please enter a directory to parse" << std::endl;
       return 0;
     }
 
-    if(options.count("key")!=1){
-      std::cout << "please enter a key to use for security" << std::endl;
-      return 0;
+    int min_key_length = 4;
+    const char* key =  get_key_from_user();
+    while (strlen(key) < min_key_length) {
+      std::cout << "Please enter a valid key." << std::endl;
+      std::cout << "Key must be longer than " << min_key_length << " characters." << std::endl;
+      const char* key =  get_key_from_user();
     }
+
     if (options.count("necc")!=1) {
       ECC = 1;
     } else {
@@ -86,13 +100,28 @@ int main(int argc, char **argv){
       exit(0);
     } 
 
-    run(options["path"].as<std::string>(), options["output"].as<std::string>(), options["key"].as<std::string>());
-  } catch (...) { // shouldn't get to here
-    std::exception_ptr p = std::current_exception();
-    std::clog <<(p ? p.__cxa_exception_type()->name() : "null") << std::endl;
+    run(options["path"].as<std::string>(), options["output"].as<std::string>(), key);
+  } catch (...) { // shouldn't get to here - means incorrect arguments
+    std::cout << "Could not parse arguments" << std::endl << std::endl;
+    display_help(argv[0]);
     exit(1);
   }
 }
+
+
+void display_help(const char* progname){
+  printf("usage: %s [options]\n\n", progname);
+  printf("Mastering options:\n"
+         "    --ouput=<s>          Name of output file"
+         "\n"
+         "    --path=<s>           Directory to parse"
+         "\n"
+         "    --necc               Turns ECC off (optional flag)"
+         "\n"
+         "    --help               Show help"
+         "\n");
+}
+
 
 int run(std::string root_directory, std::string wofs_filename, std::string key){
 
