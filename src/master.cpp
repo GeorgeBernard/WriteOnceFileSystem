@@ -22,24 +22,34 @@
 #include "config/decodeConstants.c"
 #include "config/hashConstants.c"
 
-static int s_builder(const char *, const struct stat *, int, struct FTW *);
+
 int run(std::string, std::string, std::string);
+
+//Method applied on each node of the FS, required by nftw
+static int s_builder(const char *, const struct stat *, int, struct FTW *);
+
+//Major structural methods defining each stage of the process, in order of thier usage
 int imageDFS(const std::string& out_filename, node* root);
 uint64_t writeDFS(node* node, FILE* output);
 int hashAndAppend(const char*, const char*);
 int addReedSolomon(std::string ifs, std::string ofs);
+
+// Helper Methods
 std::string parse_name(const std::string& path_name);
 std::string space_pad(const std::string& s);
 uint64_t find_header_size();
+
+// Writes endian correctly
 void write64(uint64_t, FILE*);
 void write32(uint32_t, FILE*);
 
 static uint64_t header_off;
 static uint64_t file_off;
-const int MAX_METADATA = 1000;
+//Arbitrary constant required by the transversal software
+const int MAX_METADATA = 2000;
 static unsigned long HASH_BLOCK_SIZE = DEF_HASH_BLOCK_SIZE;
 
-m_prs* meta;
+//global variables for transversal
 int metadataPointer = 0;
 int header_count = 0;
 int subitems_count = 0;
@@ -48,6 +58,7 @@ int ECC = 1;
 
 int main(int argc, char **argv){
 
+  // command line parsing information
   try{
     cxxopts::Options options("Master", "Takes in a directory and outputs an imaged File System");
     options.add_options()
@@ -84,7 +95,7 @@ int main(int argc, char **argv){
     if (ableToFind == -1) { // Path does not exist
       std::cout << path << " does not exist" << std::endl;
       exit(0);
-    } 
+    }
 
     run(options["path"].as<std::string>(), options["output"].as<std::string>(), options["key"].as<std::string>());
   } catch (...) { // shouldn't get to here
@@ -129,22 +140,6 @@ int run(std::string root_directory, std::string wofs_filename, std::string key){
   meta = (m_prs*) malloc(metadataPointer * sizeof(m_prs));
   int i = 0;
 
-  // write the tree to an array  this should be put in a separate method later
-  std::queue<node> q;
-  q.push(root);
-  while(!q.empty()){
-    node t = q.front();
-    q.pop();
-    meta[i] = *t.data;
-    i++;
-    // if not a file recurs through sub files/directories
-    if(t.fill != -1){
-      for(int j = 0; j < t.data->length; j++){
-        q.push(t.children[j]);
-      }
-    }
-  }
-
   std::string pre_filename = wofs_filename + ".necc";
 
   // Now write the file to a structure
@@ -156,9 +151,9 @@ int run(std::string root_directory, std::string wofs_filename, std::string key){
   std::cout << "Appending Sha256 Hash using Key" << "\n";
   int hashStatus = hashAndAppend(pre_filename.c_str(), key.c_str());
   if (ECC) {
-    std::cout << "Applying error correcting codes to " 
+    std::cout << "Applying error correcting codes to "
      << '\"' << pre_filename << '\"'
-     << " to create " 
+     << " to create "
      << '\"' << wofs_filename << '\"' << std::endl;
     int reedSolomonStatus = addReedSolomon(pre_filename,wofs_filename);
   }
@@ -238,7 +233,6 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
                 directories.push(parent);
             }
              // add this directory to the stack
-
             // Add ourself to the stack only if we have children
             if(parent.children[parent.fill-1].data->length != 0){
                 directories.push(parent.children[parent.fill-1]);
@@ -371,7 +365,7 @@ int hashAndAppend(const char* file_name, const char* key){
     // make the hash Hash
     unsigned char* digest;
     digest = HMAC(EVP_sha256(), key, strlen(key), buffer, block_size, NULL, NULL);
-    
+
     // Append the Hash to the file
     fwrite (digest, sizeof(char), hash_size, fp);
 
