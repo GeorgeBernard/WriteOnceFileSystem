@@ -11,6 +11,8 @@
 */
 #include <iostream>
 #include <fstream>
+#include <stdio.h>
+#include <string.h>
 #include "schifra/schifra_reed_solomon_block.hpp"
 #include "schifra/schifra_reed_solomon_decoder.hpp"
 #include "schifra/schifra_fileio.hpp"
@@ -30,6 +32,8 @@ namespace schifra
 
          typedef decoder<code_length,fec_length> decoder_type;
          typedef typename decoder_type::block_type block_type;
+         int errors_corrected;
+         int errors_detected;
 
       /*
       // Public exposed API for decoding file
@@ -39,6 +43,10 @@ namespace schifra
          inline int decode_file(const decoder_type& decoder,
                                     const std::string& input_file_name,
                                     const std::string& output_file_name) {
+            const char* input_display = strrchr(input_file_name.c_str(), '/');
+            const char* output_display = strrchr(output_file_name.c_str(), '/');
+            std::cout << "Decoding " << input_display << " ..." <<std::endl;
+
             std::size_t remaining_bytes = schifra::fileio::file_size(input_file_name);
              if (remaining_bytes == 0)
             {
@@ -83,6 +91,11 @@ namespace schifra
             in_stream.close();
             out_stream.close();
 
+            std::cout << std::endl << "REPORT " << std::endl;
+            std::cout << "Decoded " << input_display << " into " << output_display << std::endl; 
+            std::cout << "Errors detected: " << errors_detected << std::endl;
+            std::cout << "Errors corrected: " << errors_corrected << std::endl;
+            std::cout << "Recoverable: " << 1 << std::endl << std::endl;
             return SUCCESS;   
       }
 
@@ -95,7 +108,11 @@ namespace schifra
             in_stream.read(&buffer_[0],static_cast<std::streamsize>(code_length));
             copy<char,code_length,fec_length>(buffer_,code_length,block_);
 
-            if (!decoder.decode(block_))
+            int res = decoder.decode(block_);
+            errors_detected = errors_detected + block_.errors_detected;
+            errors_corrected = errors_corrected + block_.errors_corrected;
+            
+            if (!res)
             {
                std::cout << "Error during decoding of block " << current_block_index_ << "!" << std::endl;
                return ERR_DECODE;

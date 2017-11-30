@@ -30,6 +30,7 @@ int decode(std::string inFile, std::string outFile)
 
    file_decoder_t* fd = new file_decoder_t();
    int decode_success = fd -> decode_file(rs_decoder, input_file_name, output_file_name);
+   //std::cout << rs_decoder.errors_corrected << std::endl;
    free(fd);
    return decode_success;
 }
