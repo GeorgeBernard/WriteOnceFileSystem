@@ -27,6 +27,7 @@ def run_trial(test_paths, mount_paths, args):
         test_name  = test_path.split('/')[-1]
 
         if(args.verbose):
+            print(test_path, " vs ", mount_path)
             print(test_name, " vs ", mount_name)
 
         both_dir = test_is_dir & mount_is_dir
@@ -41,15 +42,18 @@ def run_trial(test_paths, mount_paths, args):
             
         if (both_file):                        
             # Compare file contents
-            test_content = open(test_path, 'r').read()
-            mount_content= open(mount_path, 'r').read()
-            match(test_content, mount_content, "File Content", args)
-
-            # compare mount stat and mount length
-            mount_stat = os.stat(mount_path)
-            test_stat  = os.stat(test_path) 
-            match(mount_stat.st_size, test_stat.st_size, "File Stat", args)
-
+            try:
+                if (args.content) :
+                    test_content = open(test_path, 'r').read()
+                    mount_content= open(mount_path, 'r').read()
+                # compare mount stat and mount length
+                mount_stat = os.stat(mount_path)
+                test_stat  = os.stat(test_path) 
+                match(mount_stat.st_size, test_stat.st_size, "File Stat", args)
+                # match(test_content, mount_content, "File Content", args)
+            except UnicodeDecodeError: 
+                print("Could not read")
+    
         if(args.verbose):
             print('-'*8)
 
@@ -70,13 +74,14 @@ def main():
     parser = argparse.ArgumentParser(description='Mutation test the WOFS against a correct filesystem')
     parser.add_argument('-t','--trials', type=int, help='Number of trials')
     parser.add_argument('-v','--verbose', action='store_true', help='show each test')
+    parser.add_argument('-c','--content', action='store_true', help='compare file content')
     parser.add_argument('-r','--randomize', action='store_true', help='shuffle access to each file')
     parser.set_defaults(trials=1)
 
     args = parser.parse_args()
 
-    mount_point = "../src/mount_point/test"
-    true_path = "../src/test"
+    mount_point = "../src/plz/tensorflow"
+    true_path = "./tensorflow"
 
     find_command = 'find '
     test_out = os.popen(find_command + true_path).read().split('\n')[0:-1]
