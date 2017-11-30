@@ -17,6 +17,7 @@
 #include <openssl/hmac.h>
 #include <math.h>
 #include "config/hashConstants.c"
+#include "requestKey.cpp"
 
 //========================== Function Declarations ===========================//
 
@@ -274,9 +275,9 @@ int checkHash(const char* file_name, const char* key) {
 	  	fread(buffer, sizeof(char), block_size, fp);
 	  	unsigned char* digest;
 	  	digest = HMAC(EVP_sha256(), key, strlen(key), buffer, block_size, NULL, NULL);
+
 	  	// compare the two hashes
 	  	for (int i =0; i< hash_size; i++) {
-	  		//printf("mastered hash: %02x\ndigest: %02x \n", mastered_hash, digest);
 	    	if ((unsigned char) mastered_hash[i] != digest[i]) {
 	    		free(buffer);
 	      		return 0;
@@ -314,7 +315,6 @@ static struct options {
     { t, offsetof(struct options, p), 1 }
 static const struct fuse_opt option_spec[] = {
 	OPTION("--image=%s", filename),
-	OPTION("--key=%s", key),
 	OPTION("-h", show_help),
 	OPTION("--help", show_help),
 	OPTION("--necc", no_ecc),
@@ -328,6 +328,8 @@ static void show_help(const char *progname)
 	       "    --image=<s>          Path to the image file"
 	       "\n"
 	       "    --key=<s>            Key to check dat validity"
+	       "\n"
+	       "    --help           	 Show help"
 	       "\n");
 }
 
@@ -381,11 +383,13 @@ int main(int argc, char *argv[])
 	}
 
 	// Verify the validity of the image
-	if (!options.key) {
-		printf("Please specify a key \n");
-		printf("Use --key=<key> \n");
-		exit(0);
-	}
+	unsigned int min_key_length = 4;
+    const char* key =  get_key_from_user();
+    while (strlen(key) < min_key_length) {
+      std::cout << "Please enter a valid key." << std::endl;
+      std::cout << "Key must be longer than " << min_key_length << " characters." << std::endl;
+      key =  get_key_from_user();
+    }
 
 	std::string outfile;
 	if (options.no_ecc) {
@@ -402,7 +406,7 @@ int main(int argc, char *argv[])
   		}
 	}
   	fp = fopen(outfile.c_str(), "r");
-	int hash_correct = checkHash(outfile.c_str(), options.key);
+	int hash_correct = checkHash(outfile.c_str(), key);
 	printf("Verifying hash... \n \n");
 	if (!hash_correct) {
 		printf("Data integrity issue detected.\n");
@@ -416,6 +420,6 @@ int main(int argc, char *argv[])
 	struct stat st;
  	stat(outfile.c_str(), &st);
   	image_file_size = st.st_size;
-  	printf("Image %s mounted successfully \n", original_path);
+  	printf("Mounting image %s \n", original_path);
 	return fuse_main(args.argc, args.argv, &mount_oper_init, NULL);
 }
