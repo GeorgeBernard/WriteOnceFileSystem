@@ -22,15 +22,16 @@
 //========================== Function Declarations ===========================//
 
 static void *mount_init(struct fuse_conn_info *conn, struct fuse_config *cfg);
+static m_hdr* find(const char* path);
+void exit_program();
+int checkHash(const char* file_name, const char* key);
+
+//========================== Global Variables ===============================//
 
 static unsigned long HASH_BLOCK_SIZE = DEF_HASH_BLOCK_SIZE;
 unsigned long image_file_size; 		// Stored to see if offset is safe or not
 FILE* fp;
 size_t prev_offset = 0;
-
-void exit_program();
-int checkHash(const char* file_name, const char* key);
-static m_hdr* find(const char* path);
 
 static void *mount_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
@@ -40,6 +41,9 @@ static void *mount_init(struct fuse_conn_info *conn,
 	return NULL;
 }
 
+/*
+* Return the metadata at the given path
+*/
 static m_hdr* find(const char* path) {
 	if (path == NULL) {
 		return NULL;
@@ -120,7 +124,7 @@ static int mount_getattr(const char *path, struct stat *stbuf,
 		stbuf->st_mode = S_IFREG | 0444;	// Read only access
 		stbuf->st_size = head -> length;
 		double file_size = head->length;
-		double block_size = 4096;
+		double block_size = 4096;			// Default block size to 4k
 		stbuf->st_blksize = block_size;
 		int num_blocks = ceil(file_size/block_size); 
 		stbuf-> st_blocks = num_blocks;
@@ -200,7 +204,6 @@ static int mount_read(const char *path, char *buf, size_t size, off_t offset,
 {
 	size_t len;
 	(void) fi;
-	//std::cout << "Mount read: " << path << std::endl;
 	
 	m_hdr* file_header = find(path);
 
@@ -218,7 +221,6 @@ static int mount_read(const char *path, char *buf, size_t size, off_t offset,
 	fseek(fp, data_block_offset, SEEK_SET);
 	char* data_buffer = (char*) malloc(length);
 	fread((void*)data_buffer, 1, length, fp);
-	//len = strlen(data_buffer);
 	len = length;
 
 	if ((unsigned uint64_t) offset < len) {
@@ -352,6 +354,7 @@ int main(int argc, char *argv[])
 	/* Parse options */
 	if (fuse_opt_parse(&args, &options, option_spec, NULL) == -1) {
 		printf("Error parsing input \n");
+		show_help();
 		return 1;
 	}
 
@@ -405,6 +408,7 @@ int main(int argc, char *argv[])
   			exit(0);
   		}
 	}
+	
   	fp = fopen(outfile.c_str(), "r");
 	int hash_correct = checkHash(outfile.c_str(), key);
 	printf("Verifying hash... \n \n");
@@ -414,7 +418,7 @@ int main(int argc, char *argv[])
 		printf("Please correct issue offline and remount.\n");
 		exit_program();
 	} else {
-		printf("Hash passed \n");
+		std::cout << "Hash passed" << std::endl;
 	}
 
 	struct stat st;

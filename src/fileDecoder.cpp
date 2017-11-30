@@ -91,7 +91,7 @@ namespace schifra
             in_stream.close();
             out_stream.close();
 
-            std::cout << std::endl << "REPORT " << std::endl;
+            std::cout << std::endl << "DECODE REPORT " << std::endl;
             std::cout << "Decoded " << input_display << " into " << output_display << std::endl; 
             std::cout << "Errors detected: " << errors_detected << std::endl;
             std::cout << "Errors corrected: " << errors_corrected << std::endl;
