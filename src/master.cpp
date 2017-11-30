@@ -461,12 +461,14 @@ uint64_t writeDFS(node* node, FILE* output) {
   bool is_reg = node -> fill == -1;
   bool is_dir = node -> fill ==  0;
 
+  // write Node is a file
   if (is_reg) {
+    // write the header info
     write64(node->data->length, output);
     write64(node->data->time, output);
     write64(file_off, output);
-    write32(node->data->type, output );
-    fseek(output, file_off, SEEK_SET); // start at header
+    write32(node->data->type, output);
+    fseek(output, file_off, SEEK_SET);
     uint64_t fileSize = node->data->length;
     int blockSize = 1024;
     int remaining = fileSize;
