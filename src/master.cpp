@@ -165,8 +165,6 @@ int run(std::string root_directory, std::string wofs_filename, std::string key){
   //iterate to real root
   node root = head.children[0];
 
-  // initialize our array structure
-  meta = (m_prs*) malloc(metadataPointer * sizeof(m_prs));
   int i = 0;
 
   std::string pre_filename = wofs_filename + ".necc";
@@ -221,8 +219,10 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
             	perror(d->d_name);
         	}
         	else{
-						char firstChar = (d-> d_name)[0];
-						if (firstChar == '.') {
+            std::cout << "name: " << d-> d_name << std::endl;
+            bool dot =  strcmp(d->d_name, ".") == 0;
+            bool doubledot = strcmp(d->d_name, "..") == 0;
+						if (dot || doubledot) {
 							continue;
 						}
 
@@ -236,7 +236,7 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
         subitems_count = subitems_count + dir_length;
 
         // Write data to
-        strncpy(h->name, buffer, 256);
+    strncpy(h->name, buffer, 256);
 		h->type = DIRECTORY;
 		h->length = dir_length;
 		h->time = object_info->st_mtime;
@@ -259,12 +259,20 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 
             // if not parent not full add parent back to the stack
             if(parent.fill != parent.data->length){
+                int sizeBefore = directories.size();
                 directories.push(parent);
+                if (directories.size() != sizeBefore + 1) {
+                  std::cout << "Error" << std::endl;
+                }
             }
              // add this directory to the stack
             // Add ourself to the stack only if we have children
             if(parent.children[parent.fill-1].data->length != 0){
+                int sizeBefore = directories.size();
                 directories.push(parent.children[parent.fill-1]);
+                if (directories.size() != sizeBefore + 1) {
+                  std::cout << "Error" << std::endl;
+                }
             }
 
         }
