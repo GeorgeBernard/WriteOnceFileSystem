@@ -83,7 +83,7 @@ int main(int argc, char **argv){
     while (strlen(key) < min_key_length) {
       std::cout << "Please enter a valid key." << std::endl;
       std::cout << "Key must be longer than " << min_key_length << " characters." << std::endl;
-      const char* key =  get_key_from_user();
+      key =  get_key_from_user();
     }
 
     if (options.count("necc")!=1) {
