@@ -76,9 +76,13 @@ def main():
     parser.add_argument('-v','--verbose', action='store_true', help='show each test')
     parser.add_argument('-c','--content', action='store_true', help='compare file content')
     parser.add_argument('-r','--randomize', action='store_true', help='shuffle access to each file')
+    parser.add_argument('mount', help='mount point path');
     parser.set_defaults(trials=1)
 
     args = parser.parse_args()
+
+    print(args.mount);
+    exit()
 
     mount_point = "../src/plz/tensorflow"
     true_path = "./tensorflow"
