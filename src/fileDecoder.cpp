@@ -13,9 +13,9 @@
 #include <fstream>
 #include <stdio.h>
 #include <string.h>
-#include "schifra/schifra_reed_solomon_block.hpp"
-#include "schifra/schifra_reed_solomon_decoder.hpp"
-#include "schifra/schifra_fileio.hpp"
+#include "../libraries/schifra/schifra_reed_solomon_block.hpp"
+#include "../libraries/schifra/schifra_reed_solomon_decoder.hpp"
+#include "../libraries/schifra/schifra_fileio.hpp"
 
 namespace schifra
 {
@@ -74,6 +74,7 @@ namespace schifra
             {
                int process_success = process_complete_block(decoder,in_stream,out_stream);
                if (process_success) {
+                  print_report(input_display, output_display, 0);
                   return ERR_DECODE;
                }
                remaining_bytes -= code_length;
@@ -84,6 +85,7 @@ namespace schifra
             {
                int process_success = process_partial_block(decoder,in_stream,out_stream,remaining_bytes);
                if (process_success) {
+                  print_report(input_display, output_display, 0);
                   return ERR_DECODE;
                }
             }
@@ -91,13 +93,24 @@ namespace schifra
             in_stream.close();
             out_stream.close();
 
+            print_report(input_display, output_display, 1);
+            return SUCCESS;   
+      }
+
+      private: 
+         inline void print_report(const char* input_display, const char* output_display, int recoverable) 
+         {
             std::cout << std::endl << "DECODE REPORT " << std::endl;
             std::cout << "Decoded " << input_display << " into " << output_display << std::endl; 
             std::cout << "Errors detected: " << errors_detected << std::endl;
             std::cout << "Errors corrected: " << errors_corrected << std::endl;
-            std::cout << "Recoverable: " << 1 << std::endl << std::endl;
-            return SUCCESS;   
-      }
+            if (recoverable) {
+               std::cout << "\033[0;32m" << "Recoverable: " << recoverable << std::endl << "\033[0m"<< std::endl;
+            } else {
+               std::cout << "\033[0;31m" << "Recoverable: " << recoverable << std::endl << "\033[0m"<< std::endl;
+            }
+         }
+
 
       private:
 

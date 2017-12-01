@@ -14,12 +14,12 @@
 #include <queue>
 #include <openssl/hmac.h>
 #include <cstddef>
-#include "cxxopts.hpp"
+#include "../libraries/cxxopts.hpp"
 #include "OnDiskStructure.h"
-#include "schifra/schifra_galois_field.hpp"
-#include "schifra/schifra_sequential_root_generator_polynomial_creator.hpp"
-#include "schifra/schifra_reed_solomon_encoder.hpp"
-#include "schifra/schifra_reed_solomon_file_encoder.hpp"
+#include "../libraries/schifra/schifra_galois_field.hpp"
+#include "../libraries/schifra/schifra_sequential_root_generator_polynomial_creator.hpp"
+#include "../libraries/schifra/schifra_reed_solomon_encoder.hpp"
+#include "../libraries/schifra/schifra_reed_solomon_file_encoder.hpp"
 #include "config/decodeConstants.c"
 #include "config/hashConstants.c"
 #include "requestKey.cpp"
@@ -89,18 +89,18 @@ int main(int argc, char **argv){
       return 0;
     }
 
+    if (options.count("necc")!=1) {
+      ECC = 1;
+    } else {
+      ECC =0;
+    }
+
     int min_key_length = 4;
     const char* key =  get_key_from_user();
     while (strlen(key) < min_key_length) {
       std::cout << "Please enter a valid key." << std::endl;
       std::cout << "Key must be longer than " << min_key_length << " characters." << std::endl;
       key =  get_key_from_user();
-    }
-
-    if (options.count("necc")!=1) {
-      ECC = 1;
-    } else {
-      ECC =0;
     }
 
     struct stat st;
@@ -219,7 +219,6 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
             	perror(d->d_name);
         	}
         	else{
-            std::cout << "name: " << d-> d_name << std::endl;
             bool dot =  strcmp(d->d_name, ".") == 0;
             bool doubledot = strcmp(d->d_name, "..") == 0;
 						if (dot || doubledot) {

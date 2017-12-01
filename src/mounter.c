@@ -73,14 +73,12 @@ static m_hdr* find(const char* path) {
 
 		uint64_t initOffset = current -> offset;
 		int childFound = 0;
-		//printf("Length: %d \n", current->length);
-		//printf("Type: %d \n", current -> type);
 		for (unsigned int i =0; i< current -> length; i++) {
 			uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
 			uint64_t next_header_block = read64(fp, nextOffset);
 			if (next_header_block > image_file_size) {
-				//printf("Attempting to traverse to a location out of range. \n");
-				//printf("Please verify the correctness of the image \n");
+				printf("Attempting to traverse to a location out of range. \n");
+				printf("Please verify the correctness of the image \n");
 				//exit_program();
 			}
 			m_hdr* child = readHeader(fp, next_header_block);
@@ -104,7 +102,6 @@ static int mount_getattr(const char *path, struct stat *stbuf,
 {
 	(void) fi;
 	int res = 0;
-	//printf("Calling get attribute on %s \n", path);
 
 	if(!path) { return -ENOENT; }
 
@@ -147,7 +144,6 @@ static int mount_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	(void) offset;
 	(void) fi;
 	(void) flags;
-	//printf("Calling read dir on %s \n", path);
 
 	m_hdr* dir_header;
 	if (strcmp(path, "/") == 0) {
@@ -174,13 +170,10 @@ static int mount_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	// Fill the buffer with all subdirectories
 	uint64_t initOffset = dir_header -> offset;
-	//printf("length: %d \n", dir_header -> length);
 	for (unsigned int i =0; i< dir_header -> length; i++) {
 		uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
-		printf("Getting child at offset: %d \n", nextOffset);
 		uint64_t next_header_block = read64(fp, nextOffset);
 		m_hdr* child = readHeader(fp, next_header_block);
-		printf("Adding %s to buffer \n", child->name);
 		filler(buf, child->name, NULL, 0, static_cast<fuse_fill_dir_flags>(0));
 	}
 
@@ -410,23 +403,37 @@ int main(int argc, char *argv[])
 		outfile = infile + ".rec";
   		int decodeResults = decode(infile, outfile);
   		if (decodeResults) {
+  			std::cout << "\033[0;31m" <<"Error" << "\033[0m" << std::endl;
   			printf("Unable to recover image from error correcing codes \n");
   			printf("Decoding exited with error status: %d\n", decodeResults);
   			printf("Please default to backups \n");
-  			exit(0);
+  			printf("Continue? Behavior of program may be undefined [y/n]: ");
+  			char yn[5];
+  			fgets(yn,4,stdin);
+  			if (yn[0] != 'y') {
+  				exit(0);
+  			}
+  			std::cout << "Continuing..." << std::endl;
   		}
 	}
 	
   	fp = fopen(outfile.c_str(), "r");
 	int hash_correct = checkHash(outfile.c_str(), key);
-	printf("Verifying hash... \n \n");
+	printf("\nVerifying hash... \n \n");
 	if (!hash_correct) {
+		std::cout << "\033[0;31m" <<"Error" << "\033[0m" << std::endl;
 		printf("Data integrity issue detected.\n");
 		printf("Please verify the key you are using is correct.\n");
 		printf("Please correct issue offline and remount.\n");
-		exit_program();
+		printf("Continue? Behavior of program may be undefined [y/n]: ");
+  		char yn[5];
+  		fgets(yn,4,stdin);
+  		if (yn[0] != 'y') {
+  			exit_program();
+  		}
+  		std::cout << "Continuing..." << std::endl;
 	} else {
-		std::cout << "Hash passed" << std::endl;
+		std::cout << "\033[0;32m" <<"Hash passed" << "\033[0m" << std::endl;
 	}
 
 	struct stat st;

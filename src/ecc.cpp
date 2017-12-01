@@ -2,11 +2,11 @@
 #include <string>
 #include <iostream>
 #include <fstream>
-#include "schifra/schifra_reed_solomon_block.hpp"
-#include "schifra/schifra_fileio.hpp"
-#include "schifra/schifra_galois_field.hpp"
-#include "schifra/schifra_sequential_root_generator_polynomial_creator.hpp"
-#include "schifra/schifra_reed_solomon_decoder.hpp"
+#include "../libraries/schifra/schifra_reed_solomon_block.hpp"
+#include "../libraries/schifra/schifra_fileio.hpp"
+#include "../libraries/schifra/schifra_galois_field.hpp"
+#include "../libraries/schifra/schifra_sequential_root_generator_polynomial_creator.hpp"
+#include "../libraries/schifra/schifra_reed_solomon_decoder.hpp"
 #include "fileDecoder.cpp"
 #include "config/decodeConstants.c"
 
