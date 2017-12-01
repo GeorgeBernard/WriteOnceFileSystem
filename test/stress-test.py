@@ -76,16 +76,19 @@ def main():
     parser.add_argument('-v','--verbose', action='store_true', help='show each test')
     parser.add_argument('-c','--content', action='store_true', help='compare file content')
     parser.add_argument('-r','--randomize', action='store_true', help='shuffle access to each file')
-    parser.add_argument('mount', help='mount point path');
+    parser.add_argument('-m', '--mount', help='mount point path', required=True);
+    parser.add_argument('-o', '--original', help='original path', required=True);
     parser.set_defaults(trials=1)
 
     args = parser.parse_args()
 
+    print("Comparing")
+    print(args.original)
+    print("and")
     print(args.mount);
-    exit()
 
-    mount_point = "../src/plz/tensorflow"
-    true_path = "./tensorflow"
+    mount_point = args.mount
+    true_path = args.original
 
     find_command = 'find '
     test_out = os.popen(find_command + true_path).read().split('\n')[0:-1]
