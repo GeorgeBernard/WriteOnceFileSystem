@@ -11,9 +11,11 @@
 */
 #include <iostream>
 #include <fstream>
-#include "schifra/schifra_reed_solomon_block.hpp"
-#include "schifra/schifra_reed_solomon_decoder.hpp"
-#include "schifra/schifra_fileio.hpp"
+#include <stdio.h>
+#include <string.h>
+#include "../libraries/schifra/schifra_reed_solomon_block.hpp"
+#include "../libraries/schifra/schifra_reed_solomon_decoder.hpp"
+#include "../libraries/schifra/schifra_fileio.hpp"
 
 namespace schifra
 {
@@ -30,6 +32,8 @@ namespace schifra
 
          typedef decoder<code_length,fec_length> decoder_type;
          typedef typename decoder_type::block_type block_type;
+         int errors_corrected;
+         int errors_detected;
 
       /*
       // Public exposed API for decoding file
@@ -39,6 +43,10 @@ namespace schifra
          inline int decode_file(const decoder_type& decoder,
                                     const std::string& input_file_name,
                                     const std::string& output_file_name) {
+            const char* input_display = strrchr(input_file_name.c_str(), '/');
+            const char* output_display = strrchr(output_file_name.c_str(), '/');
+            std::cout << "Decoding " << input_display << " ..." <<std::endl;
+
             std::size_t remaining_bytes = schifra::fileio::file_size(input_file_name);
              if (remaining_bytes == 0)
             {
@@ -66,6 +74,7 @@ namespace schifra
             {
                int process_success = process_complete_block(decoder,in_stream,out_stream);
                if (process_success) {
+                  print_report(input_display, output_display, 0);
                   return ERR_DECODE;
                }
                remaining_bytes -= code_length;
@@ -76,6 +85,7 @@ namespace schifra
             {
                int process_success = process_partial_block(decoder,in_stream,out_stream,remaining_bytes);
                if (process_success) {
+                  print_report(input_display, output_display, 0);
                   return ERR_DECODE;
                }
             }
@@ -83,8 +93,24 @@ namespace schifra
             in_stream.close();
             out_stream.close();
 
+            print_report(input_display, output_display, 1);
             return SUCCESS;   
       }
+
+      private: 
+         inline void print_report(const char* input_display, const char* output_display, int recoverable) 
+         {
+            std::cout << std::endl << "DECODE REPORT " << std::endl;
+            std::cout << "Decoded " << input_display << " into " << output_display << std::endl; 
+            std::cout << "Errors detected: " << errors_detected << std::endl;
+            std::cout << "Errors corrected: " << errors_corrected << std::endl;
+            if (recoverable) {
+               std::cout << "\033[0;32m" << "Recoverable: " << recoverable << std::endl << "\033[0m"<< std::endl;
+            } else {
+               std::cout << "\033[0;31m" << "Recoverable: " << recoverable << std::endl << "\033[0m"<< std::endl;
+            }
+         }
+
 
       private:
 
@@ -95,7 +121,11 @@ namespace schifra
             in_stream.read(&buffer_[0],static_cast<std::streamsize>(code_length));
             copy<char,code_length,fec_length>(buffer_,code_length,block_);
 
-            if (!decoder.decode(block_))
+            int res = decoder.decode(block_);
+            errors_detected = errors_detected + block_.errors_detected;
+            errors_corrected = errors_corrected + block_.errors_corrected;
+            
+            if (!res)
             {
                std::cout << "Error during decoding of block " << current_block_index_ << "!" << std::endl;
                return ERR_DECODE;

@@ -17,19 +17,21 @@
 #include <openssl/hmac.h>
 #include <math.h>
 #include "config/hashConstants.c"
+#include "requestKey.cpp"
 
 //========================== Function Declarations ===========================//
 
 static void *mount_init(struct fuse_conn_info *conn, struct fuse_config *cfg);
+static m_hdr* find(const char* path);
+void exit_program();
+int checkHash(const char* file_name, const char* key);
+
+//========================== Global Variables ===============================//
 
 static unsigned long HASH_BLOCK_SIZE = DEF_HASH_BLOCK_SIZE;
 unsigned long image_file_size; 		// Stored to see if offset is safe or not
 FILE* fp;
 size_t prev_offset = 0;
-
-void exit_program();
-int checkHash(const char* file_name, const char* key);
-static m_hdr* find(const char* path);
 
 static void *mount_init(struct fuse_conn_info *conn,
 			struct fuse_config *cfg)
@@ -39,17 +41,22 @@ static void *mount_init(struct fuse_conn_info *conn,
 	return NULL;
 }
 
+/*
+* Return the metadata at the given path
+*/
 static m_hdr* find(const char* path) {
 	if (path == NULL) {
 		return NULL;
 	}
 
+	//printf("Calling find on %s. \n", path);
 	char* pathCopy = (char*) malloc(strlen(path) + 1);
 	strcpy(pathCopy, path);
 	char* token = strtok(pathCopy, "/");
 	m_hdr* root = readHeader(fp, 0);
 	m_hdr* current = root;
 
+	//printf("token found\n");
 	while (token != NULL) {
 		if (strcmp(current -> name, token) !=0) {
 			return NULL;
@@ -66,14 +73,13 @@ static m_hdr* find(const char* path) {
 
 		uint64_t initOffset = current -> offset;
 		int childFound = 0;
-
 		for (unsigned int i =0; i< current -> length; i++) {
 			uint64_t nextOffset = initOffset + i*sizeof(uint64_t);
 			uint64_t next_header_block = read64(fp, nextOffset);
 			if (next_header_block > image_file_size) {
 				printf("Attempting to traverse to a location out of range. \n");
 				printf("Please verify the correctness of the image \n");
-				exit_program();
+				//exit_program();
 			}
 			m_hdr* child = readHeader(fp, next_header_block);
 
@@ -119,7 +125,7 @@ static int mount_getattr(const char *path, struct stat *stbuf,
 		stbuf->st_mode = S_IFREG | 0444;	// Read only access
 		stbuf->st_size = head -> length;
 		double file_size = head->length;
-		double block_size = 4096;
+		double block_size = 4096;			// Default block size to 4k
 		stbuf->st_blksize = block_size;
 		int num_blocks = ceil(file_size/block_size); 
 		stbuf-> st_blocks = num_blocks;
@@ -199,7 +205,6 @@ static int mount_read(const char *path, char *buf, size_t size, off_t offset,
 {
 	size_t len;
 	(void) fi;
-	//std::cout << "Mount read: " << path << std::endl;
 	
 	m_hdr* file_header = find(path);
 
@@ -217,7 +222,6 @@ static int mount_read(const char *path, char *buf, size_t size, off_t offset,
 	fseek(fp, data_block_offset, SEEK_SET);
 	char* data_buffer = (char*) malloc(length);
 	fread((void*)data_buffer, 1, length, fp);
-	//len = strlen(data_buffer);
 	len = length;
 
 	if ((unsigned uint64_t) offset < len) {
@@ -274,9 +278,9 @@ int checkHash(const char* file_name, const char* key) {
 	  	fread(buffer, sizeof(char), block_size, fp);
 	  	unsigned char* digest;
 	  	digest = HMAC(EVP_sha256(), key, strlen(key), buffer, block_size, NULL, NULL);
+
 	  	// compare the two hashes
 	  	for (int i =0; i< hash_size; i++) {
-	  		//printf("mastered hash: %02x\ndigest: %02x \n", mastered_hash, digest);
 	    	if ((unsigned char) mastered_hash[i] != digest[i]) {
 	    		free(buffer);
 	      		return 0;
@@ -314,7 +318,6 @@ static struct options {
     { t, offsetof(struct options, p), 1 }
 static const struct fuse_opt option_spec[] = {
 	OPTION("--image=%s", filename),
-	OPTION("--key=%s", key),
 	OPTION("-h", show_help),
 	OPTION("--help", show_help),
 	OPTION("--necc", no_ecc),
@@ -328,6 +331,8 @@ static void show_help(const char *progname)
 	       "    --image=<s>          Path to the image file"
 	       "\n"
 	       "    --key=<s>            Key to check dat validity"
+	       "\n"
+	       "    --help           	 Show help"
 	       "\n");
 }
 
@@ -350,6 +355,7 @@ int main(int argc, char *argv[])
 	/* Parse options */
 	if (fuse_opt_parse(&args, &options, option_spec, NULL) == -1) {
 		printf("Error parsing input \n");
+		show_help(argv[0]);
 		return 1;
 	}
 
@@ -381,11 +387,13 @@ int main(int argc, char *argv[])
 	}
 
 	// Verify the validity of the image
-	if (!options.key) {
-		printf("Please specify a key \n");
-		printf("Use --key=<key> \n");
-		exit(0);
-	}
+	unsigned int min_key_length = 4;
+    const char* key =  get_key_from_user();
+    while (strlen(key) < min_key_length) {
+      std::cout << "Please enter a valid key." << std::endl;
+      std::cout << "Key must be longer than " << min_key_length << " characters." << std::endl;
+      key =  get_key_from_user();
+    }
 
 	std::string outfile;
 	if (options.no_ecc) {
@@ -395,27 +403,42 @@ int main(int argc, char *argv[])
 		outfile = infile + ".rec";
   		int decodeResults = decode(infile, outfile);
   		if (decodeResults) {
+  			std::cout << "\033[0;31m" <<"Error" << "\033[0m" << std::endl;
   			printf("Unable to recover image from error correcing codes \n");
   			printf("Decoding exited with error status: %d\n", decodeResults);
   			printf("Please default to backups \n");
-  			exit(0);
+  			printf("Continue? Behavior of program may be undefined [y/n]: ");
+  			char yn[5];
+  			fgets(yn,4,stdin);
+  			if (yn[0] != 'y') {
+  				exit(0);
+  			}
+  			std::cout << "Continuing..." << std::endl;
   		}
 	}
+	
   	fp = fopen(outfile.c_str(), "r");
-	int hash_correct = checkHash(outfile.c_str(), options.key);
-	printf("Verifying hash... \n \n");
+	int hash_correct = checkHash(outfile.c_str(), key);
+	printf("\nVerifying hash... \n \n");
 	if (!hash_correct) {
+		std::cout << "\033[0;31m" <<"Error" << "\033[0m" << std::endl;
 		printf("Data integrity issue detected.\n");
 		printf("Please verify the key you are using is correct.\n");
 		printf("Please correct issue offline and remount.\n");
-		exit_program();
+		printf("Continue? Behavior of program may be undefined [y/n]: ");
+  		char yn[5];
+  		fgets(yn,4,stdin);
+  		if (yn[0] != 'y') {
+  			exit_program();
+  		}
+  		std::cout << "Continuing..." << std::endl;
 	} else {
-		printf("Hash passed \n");
+		std::cout << "\033[0;32m" <<"Hash passed" << "\033[0m" << std::endl;
 	}
 
 	struct stat st;
  	stat(outfile.c_str(), &st);
   	image_file_size = st.st_size;
-  	printf("Image %s mounted successfully \n", original_path);
+  	printf("Mounting image %s \n", original_path);
 	return fuse_main(args.argc, args.argv, &mount_oper_init, NULL);
 }

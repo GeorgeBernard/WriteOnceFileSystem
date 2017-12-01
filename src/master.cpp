@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <sys/stat.h>
@@ -13,33 +14,45 @@
 #include <queue>
 #include <openssl/hmac.h>
 #include <cstddef>
-#include "cxxopts.hpp"
+#include "../libraries/cxxopts.hpp"
 #include "OnDiskStructure.h"
-#include "schifra/schifra_galois_field.hpp"
-#include "schifra/schifra_sequential_root_generator_polynomial_creator.hpp"
-#include "schifra/schifra_reed_solomon_encoder.hpp"
-#include "schifra/schifra_reed_solomon_file_encoder.hpp"
+#include "../libraries/schifra/schifra_galois_field.hpp"
+#include "../libraries/schifra/schifra_sequential_root_generator_polynomial_creator.hpp"
+#include "../libraries/schifra/schifra_reed_solomon_encoder.hpp"
+#include "../libraries/schifra/schifra_reed_solomon_file_encoder.hpp"
 #include "config/decodeConstants.c"
 #include "config/hashConstants.c"
+#include "requestKey.cpp"
 
-static int s_builder(const char *, const struct stat *, int, struct FTW *);
+
 int run(std::string, std::string, std::string);
+
+//Method applied on each node of the FS, required by nftw
+static int s_builder(const char *, const struct stat *, int, struct FTW *);
+
+//Major structural methods defining each stage of the process, in order of thier usage
 int imageDFS(const std::string& out_filename, node* root);
 uint64_t writeDFS(node* node, FILE* output);
 int hashAndAppend(const char*, const char*);
 int addReedSolomon(std::string ifs, std::string ofs);
+
+// Helper Methods
 std::string parse_name(const std::string& path_name);
 std::string space_pad(const std::string& s);
 uint64_t find_header_size();
+
+// Writes endian correctly
 void write64(uint64_t, FILE*);
 void write32(uint32_t, FILE*);
+void display_help(const char* progname);
 
 static uint64_t header_off;
 static uint64_t file_off;
-const int MAX_METADATA = 1000;
+//Arbitrary constant required by the transversal software
+const int MAX_METADATA = 2000;
 static unsigned long HASH_BLOCK_SIZE = DEF_HASH_BLOCK_SIZE;
 
-m_prs* meta;
+//global variables for transversal
 int metadataPointer = 0;
 int header_count = 0;
 int subitems_count = 0;
@@ -48,34 +61,46 @@ int ECC = 1;
 
 int main(int argc, char **argv){
 
+  // command line parsing information
   try{
     cxxopts::Options options("Master", "Takes in a directory and outputs an imaged File System");
     options.add_options()
     ("o,output", "Name of output filename", cxxopts::value<std::string>())
     ("p,path", "relative path to directory to master", cxxopts::value<std::string>())
-    ("k,key", "Key for sha256 hashing", cxxopts::value<std::string>())
     ("n,necc", "No ECC codes")
+    ("h,help", "Show help")
     ;
     options.parse(argc, argv);
 
+    if (options.count("help")==1) {
+      std::cout << "Help flag indicated." << std::endl;
+      std::cout << "Showing help and exiting." <<std::endl << std::endl;
+      display_help(argv[0]);
+      exit(1);
+    }
+
     if(options.count("output")!=1){
-      std::cout << "please enter an output file name" << std::endl;
+      std::cout << "Please enter an output file name" << std::endl;
       return 0;
     }
 
     if(options.count("path")!=1){
-      std::cout << "please enter a directory to parse" << std::endl;
+      std::cout << "Please enter a directory to parse" << std::endl;
       return 0;
     }
 
-    if(options.count("key")!=1){
-      std::cout << "please enter a key to use for security" << std::endl;
-      return 0;
-    }
     if (options.count("necc")!=1) {
       ECC = 1;
     } else {
       ECC =0;
+    }
+
+    int min_key_length = 4;
+    const char* key =  get_key_from_user();
+    while (strlen(key) < min_key_length) {
+      std::cout << "Please enter a valid key." << std::endl;
+      std::cout << "Key must be longer than " << min_key_length << " characters." << std::endl;
+      key =  get_key_from_user();
     }
 
     struct stat st;
@@ -84,15 +109,30 @@ int main(int argc, char **argv){
     if (ableToFind == -1) { // Path does not exist
       std::cout << path << " does not exist" << std::endl;
       exit(0);
-    } 
+    }
 
-    run(options["path"].as<std::string>(), options["output"].as<std::string>(), options["key"].as<std::string>());
-  } catch (...) { // shouldn't get to here
-    std::exception_ptr p = std::current_exception();
-    std::clog <<(p ? p.__cxa_exception_type()->name() : "null") << std::endl;
+    run(options["path"].as<std::string>(), options["output"].as<std::string>(), key);
+  } catch (...) { // shouldn't get to here - means incorrect arguments
+    std::cout << "Could not parse arguments" << std::endl << std::endl;
+    display_help(argv[0]);
     exit(1);
   }
 }
+
+
+void display_help(const char* progname){
+  printf("usage: %s [options]\n\n", progname);
+  printf("Mastering options:\n"
+         "    --ouput=<s>          Name of output file"
+         "\n"
+         "    --path=<s>           Directory to parse"
+         "\n"
+         "    --necc               Turns ECC off (optional flag)"
+         "\n"
+         "    --help               Show help"
+         "\n");
+}
+
 
 int run(std::string root_directory, std::string wofs_filename, std::string key){
 
@@ -125,25 +165,7 @@ int run(std::string root_directory, std::string wofs_filename, std::string key){
   //iterate to real root
   node root = head.children[0];
 
-  // initialize our array structure
-  meta = (m_prs*) malloc(metadataPointer * sizeof(m_prs));
   int i = 0;
-
-  // write the tree to an array  this should be put in a separate method later
-  std::queue<node> q;
-  q.push(root);
-  while(!q.empty()){
-    node t = q.front();
-    q.pop();
-    meta[i] = *t.data;
-    i++;
-    // if not a file recurs through sub files/directories
-    if(t.fill != -1){
-      for(int j = 0; j < t.data->length; j++){
-        q.push(t.children[j]);
-      }
-    }
-  }
 
   std::string pre_filename = wofs_filename + ".necc";
 
@@ -156,9 +178,9 @@ int run(std::string root_directory, std::string wofs_filename, std::string key){
   std::cout << "Appending Sha256 Hash using Key" << "\n";
   int hashStatus = hashAndAppend(pre_filename.c_str(), key.c_str());
   if (ECC) {
-    std::cout << "Applying error correcting codes to " 
+    std::cout << "Applying error correcting codes to "
      << '\"' << pre_filename << '\"'
-     << " to create " 
+     << " to create "
      << '\"' << wofs_filename << '\"' << std::endl;
     int reedSolomonStatus = addReedSolomon(pre_filename,wofs_filename);
   }
@@ -197,8 +219,9 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
             	perror(d->d_name);
         	}
         	else{
-						char firstChar = (d-> d_name)[0];
-						if (firstChar == '.') {
+            bool dot =  strcmp(d->d_name, ".") == 0;
+            bool doubledot = strcmp(d->d_name, "..") == 0;
+						if (dot || doubledot) {
 							continue;
 						}
 
@@ -212,7 +235,7 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
         subitems_count = subitems_count + dir_length;
 
         // Write data to
-        strncpy(h->name, buffer, 256);
+    strncpy(h->name, buffer, 256);
 		h->type = DIRECTORY;
 		h->length = dir_length;
 		h->time = object_info->st_mtime;
@@ -235,13 +258,20 @@ static int s_builder(const char * path_name, const struct stat * object_info, in
 
             // if not parent not full add parent back to the stack
             if(parent.fill != parent.data->length){
+                int sizeBefore = directories.size();
                 directories.push(parent);
+                if (directories.size() != sizeBefore + 1) {
+                  std::cout << "Error" << std::endl;
+                }
             }
              // add this directory to the stack
-
             // Add ourself to the stack only if we have children
             if(parent.children[parent.fill-1].data->length != 0){
+                int sizeBefore = directories.size();
                 directories.push(parent.children[parent.fill-1]);
+                if (directories.size() != sizeBefore + 1) {
+                  std::cout << "Error" << std::endl;
+                }
             }
 
         }
@@ -371,7 +401,7 @@ int hashAndAppend(const char* file_name, const char* key){
     // make the hash Hash
     unsigned char* digest;
     digest = HMAC(EVP_sha256(), key, strlen(key), buffer, block_size, NULL, NULL);
-    
+
     // Append the Hash to the file
     fwrite (digest, sizeof(char), hash_size, fp);
 
@@ -438,12 +468,14 @@ uint64_t writeDFS(node* node, FILE* output) {
   bool is_reg = node -> fill == -1;
   bool is_dir = node -> fill ==  0;
 
+  // write Node is a file
   if (is_reg) {
+    // write the header info
     write64(node->data->length, output);
     write64(node->data->time, output);
     write64(file_off, output);
-    write32(node->data->type, output );
-    fseek(output, file_off, SEEK_SET); // start at header
+    write32(node->data->type, output);
+    fseek(output, file_off, SEEK_SET);
     uint64_t fileSize = node->data->length;
     int blockSize = 1024;
     int remaining = fileSize;

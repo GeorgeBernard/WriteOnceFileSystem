@@ -2,11 +2,11 @@
 #include <string>
 #include <iostream>
 #include <fstream>
-#include "schifra/schifra_reed_solomon_block.hpp"
-#include "schifra/schifra_fileio.hpp"
-#include "schifra/schifra_galois_field.hpp"
-#include "schifra/schifra_sequential_root_generator_polynomial_creator.hpp"
-#include "schifra/schifra_reed_solomon_decoder.hpp"
+#include "../libraries/schifra/schifra_reed_solomon_block.hpp"
+#include "../libraries/schifra/schifra_fileio.hpp"
+#include "../libraries/schifra/schifra_galois_field.hpp"
+#include "../libraries/schifra/schifra_sequential_root_generator_polynomial_creator.hpp"
+#include "../libraries/schifra/schifra_reed_solomon_decoder.hpp"
 #include "fileDecoder.cpp"
 #include "config/decodeConstants.c"
 
@@ -30,6 +30,7 @@ int decode(std::string inFile, std::string outFile)
 
    file_decoder_t* fd = new file_decoder_t();
    int decode_success = fd -> decode_file(rs_decoder, input_file_name, output_file_name);
+   //std::cout << rs_decoder.errors_corrected << std::endl;
    free(fd);
    return decode_success;
 }
