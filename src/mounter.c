@@ -148,6 +148,7 @@ static int mount_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	m_hdr* dir_header;
 	if (strcmp(path, "/") == 0) {
 		dir_header = readHeader(fp, 0);
+		// Address of struct stat = NULL, next offset = 0 (not used)
 		filler(buf, ".", NULL, 0, static_cast<fuse_fill_dir_flags>(0));
 		filler(buf, "..", NULL, 0, static_cast<fuse_fill_dir_flags>(0));
 		filler(buf, dir_header -> name, NULL, 0, static_cast<fuse_fill_dir_flags>(0));
@@ -177,7 +178,7 @@ static int mount_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		filler(buf, child->name, NULL, 0, static_cast<fuse_fill_dir_flags>(0));
 	}
 
-	return 0;
+	return 0; // no more files
 }
 
 static int mount_open(const char *path, struct fuse_file_info *fi)

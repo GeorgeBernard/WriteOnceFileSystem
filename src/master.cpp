@@ -483,6 +483,7 @@ uint64_t writeDFS(node* node, FILE* output) {
       blockSize = fileSize;
     }
     FILE* open_file = fopen((node->data->p), "r");
+    // check on success
     char* file_buffer[blockSize];
     while (remaining > 0) {
       size_t bytes;
